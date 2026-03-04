@@ -11,3 +11,4 @@ uv.lock
 .python-version
 *.mp4
 gen_readme_*.py
+paper/
