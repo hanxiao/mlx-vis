@@ -2,7 +2,7 @@
 
 Pure MLX implementations of UMAP, t-SNE, PaCMAP, TriMap, DREAMS, CNE, and NNDescent for Apple Silicon. Metal GPU acceleration for both computation and video rendering. No scipy, no sklearn, no matplotlib.
 
-**Embed 70K points in 3-4 seconds. Add GPU-rendered animation video in under 6 seconds total.**
+Embed 70K points in **3-4 seconds**. Add GPU-rendered animation video in under **6 seconds** total. See [benchmark](#benchmark).
 
 Fashion-MNIST 70K on M3 Ultra:
 
@@ -127,7 +127,9 @@ https://github.com/user-attachments/assets/0461359c-7e35-4458-9f06-8db8711f8ade
 
 https://github.com/user-attachments/assets/662597cb-b8d8-496f-9baa-ea3a19ae1bca
 
-**Benchmark on Fashion-MNIST 70,000 x 784, M3 Ultra:**
+### Benchmark
+
+Fashion-MNIST 70,000 x 784, M3 Ultra:
 
 | | UMAP | t-SNE | PaCMAP | TriMap | DREAMS | CNE |
 |---|---|---|---|---|---|---|
