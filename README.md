@@ -1,6 +1,6 @@
 # mlx-vis
 
-Dimensionality reduction on Apple Silicon. UMAP, t-SNE, PaCMAP, and NNDescent - all running on Metal via MLX.
+Pure MLX + NumPy implementations of UMAP, t-SNE, PaCMAP, and NNDescent for Apple Silicon. No scipy, no sklearn - just Metal GPU acceleration via MLX.
 
 ## Install
 
