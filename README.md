@@ -2,6 +2,8 @@
 
 Pure MLX + NumPy implementations of UMAP, t-SNE, PaCMAP, and NNDescent for Apple Silicon. No scipy, no sklearn - just Metal GPU acceleration via MLX.
 
+![Fashion-MNIST 70K, 500 iterations on M3 Ultra](comparison.png)
+
 ## Install
 
 ```bash
