@@ -71,8 +71,46 @@ def _resolve_colors(labels, colors, n_points, theme):
     return np.full((n_points, 4), [0.2, 0.4, 0.7, 1.0], dtype=np.float32)
 
 
-def scatter(Y, labels=None, theme="dark", colors=None, point_size=2,
-            alpha=0.6, title=None, save=None, width=1000, height=1000):
+def scatter(Y, labels=None, theme="dark", colors=None, point_size=1.5,
+            alpha=0.6, title=None, figsize=(10, 10), save=None, dpi=150):
+    """Static scatter plot using matplotlib (CPU fallback)."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    Y = np.asarray(Y)
+    c = _resolve_colors(labels, colors, len(Y), theme)
+    c = np.array(c, dtype=np.float64)
+    c[:, 3] = alpha
+
+    bg = "black" if theme == "dark" else "white"
+    fg = "white" if theme == "dark" else "black"
+
+    fig, ax = plt.subplots(1, 1, figsize=figsize)
+    fig.set_facecolor(bg)
+    ax.set_facecolor(bg)
+
+    xlim, ylim = _get_square_lims(Y)
+    ax.set_xlim(*xlim)
+    ax.set_ylim(*ylim)
+    ax.set_aspect("equal")
+    ax.axis("off")
+
+    ax.scatter(Y[:, 0], Y[:, 1], s=point_size, c=c, edgecolors="none")
+
+    if title:
+        ax.set_title(title, color=fg, fontsize=14, pad=10, fontfamily="monospace")
+
+    fig.tight_layout(pad=0.5)
+
+    if save:
+        fig.savefig(save, dpi=dpi, facecolor=bg, bbox_inches="tight")
+
+    return fig
+
+
+def scatter_gpu(Y, labels=None, theme="dark", colors=None, point_size=2,
+                alpha=0.6, title=None, save=None, width=1000, height=1000):
     """Static scatter plot rendered on Metal GPU via MLX.
 
     Args:
@@ -87,7 +125,6 @@ def scatter(Y, labels=None, theme="dark", colors=None, point_size=2,
         width: image width in pixels.
         height: image height in pixels.
     """
-    import mlx.core as mx
     from .render import render_frame
     import subprocess
 
@@ -97,19 +134,15 @@ def scatter(Y, labels=None, theme="dark", colors=None, point_size=2,
     c[:, 3] = alpha
 
     bg_val = 0.0 if theme == "dark" else 1.0
-    bg_color = mx.array([bg_val, bg_val, bg_val, 1.0], dtype=mx.float32)
+    bg_color = np.array([bg_val, bg_val, bg_val, 1.0], dtype=np.float32)
 
     xlim, ylim = _get_square_lims(Y)
 
-    frame = render_frame(
-        mx.array(Y, dtype=mx.float32),
-        mx.array(c, dtype=mx.float32),
-        width, height, xlim, ylim,
-        point_radius=int(point_size),
+    pixels = render_frame(
+        Y, c, width, height, xlim, ylim,
+        point_radius=point_size,
         bg_color=bg_color,
     )
-    mx.eval(frame)
-    pixels = np.array(frame)
 
     if save:
         # write raw RGBA to PNG via ffmpeg (no PIL/matplotlib dependency)
@@ -127,55 +160,44 @@ def scatter(Y, labels=None, theme="dark", colors=None, point_size=2,
 
 
 def animate(snapshots, labels=None, timestamps=None, method_name="",
-                dataset_name="", fps=120, theme="dark", colors=None,
-                point_size=1.5, alpha=0.6, init_hold=0.5, end_hold=2.0,
-                save="animation.mp4", width=1000, height=1000, bitrate=8000):
-    """GPU-accelerated animation using MLX Metal + ffmpeg pipe.
+            dataset_name="", fps=120, theme="dark", colors=None,
+            point_size=1.5, alpha=0.6, init_hold=0.5, end_hold=2.0,
+            save="animation.mp4", bitrate=8000, figsize=(10, 10)):
+    """Render animation using matplotlib (CPU fallback)."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import matplotlib.animation as mpl_anim
 
-    Same interface as animate() but renders on GPU without matplotlib.
-    Uses h264_videotoolbox for hardware video encoding on Mac.
-
-    Returns total frames rendered.
-    """
-    import subprocess
-    import mlx.core as mx
-    from mlx_vis.render import render_frame
-
-    snapshots_np = [np.asarray(s) for s in snapshots]
-    n_snap = len(snapshots_np)
-    n_points = len(snapshots_np[0])
+    snapshots = [np.asarray(s) for s in snapshots]
+    n_snap = len(snapshots)
+    n_points = len(snapshots[0])
     n_epochs = n_snap - 1
 
-    # resolve colors
     c = _resolve_colors(labels, colors, n_points, theme)
-    c = np.array(c, dtype=np.float32)
+    c = np.array(c, dtype=np.float64)
     c[:, 3] = alpha
-    colors_mx = mx.array(c)
 
-    # compute axis limits from final snapshot
-    xlim, ylim = _get_square_lims(snapshots_np[-1])
+    bg = "black" if theme == "dark" else "white"
+    fg = "white" if theme == "dark" else "black"
 
-    # convert all snapshots to mx.array upfront
-    snapshots_mx = [mx.array(s.astype(np.float32)) for s in snapshots_np]
+    xlim, ylim = _get_square_lims(snapshots[-1])
 
-    # background color
-    if theme == "dark":
-        bg = mx.array([0.0, 0.0, 0.0, 1.0], dtype=mx.float32)
-    else:
-        bg = mx.array([1.0, 1.0, 1.0, 1.0], dtype=mx.float32)
+    fig, ax = plt.subplots(1, 1, figsize=figsize)
+    fig.set_facecolor(bg)
+    ax.set_facecolor(bg)
+    ax.set_xlim(*xlim)
+    ax.set_ylim(*ylim)
+    ax.set_aspect("equal")
+    ax.axis("off")
 
-    # point radius from point_size (sqrt scaling, minimum 1px)
-    point_radius = max(1, int(round(np.sqrt(point_size) * 1.2)))
+    sc = ax.scatter([], [], s=point_size)
+    ttl = ax.set_title("", color=fg, fontsize=14, pad=10, fontfamily="monospace")
 
-    # title text overlay via ffmpeg drawtext
-    fg_hex = "ffffff" if theme == "dark" else "000000"
-
-    # frame counts
     init_f = int(init_hold * fps)
     hold_f = int(end_hold * fps)
     total_f = init_f + n_snap + hold_f
 
-    # build title text for each unique snapshot index
     def _title_text(idx):
         parts = []
         if method_name:
@@ -190,25 +212,68 @@ def animate(snapshots, labels=None, timestamps=None, method_name="",
             parts.append("done")
         if timestamps:
             t = timestamps[min(idx, len(timestamps) - 1)]
-            if idx >= n_snap - 1:
-                parts.append(f"t={t:.1f}s")
-            else:
-                parts.append(f"t={t:.2f}s")
+            parts.append(f"t={t:.1f}s" if idx >= n_snap - 1 else f"t={t:.2f}s")
         return "  ".join(parts)
 
-    # build ffmpeg command with drawtext filter for title
-    vf_parts = []
-    # drawtext for title
-    title_text = _title_text(0)  # will update per-frame via metadata, but ffmpeg drawtext is static
-    # Instead: we burn text into frames by sending via ffmpeg per-segment, or skip text for simplicity
-    # For v1: use a single ffmpeg with no text overlay (title can be added post-hoc)
+    def update(frame):
+        if frame < init_f:
+            idx = 0
+        elif frame < init_f + n_snap:
+            idx = frame - init_f
+        else:
+            idx = n_snap - 1
+        sc.set_offsets(snapshots[idx])
+        sc.set_color(c)
+        ttl.set_text(_title_text(idx))
+        return sc, ttl
+
+    anim = mpl_anim.FuncAnimation(fig, update, frames=total_f, blit=True,
+                                   interval=1000 // fps)
+    writer = mpl_anim.FFMpegWriter(fps=fps, bitrate=bitrate,
+                                    extra_args=["-pix_fmt", "yuv420p"])
+    anim.save(save, writer=writer)
+    plt.close(fig)
+    return total_f
+
+
+def animate_gpu(snapshots, labels=None, timestamps=None, method_name="",
+                dataset_name="", fps=120, theme="dark", colors=None,
+                point_size=1.5, alpha=0.6, init_hold=0.5, end_hold=2.0,
+                save="animation.mp4", width=1000, height=1000, bitrate=8000):
+    """GPU-accelerated animation using MLX Metal + ffmpeg pipe.
+
+    Renders on Metal GPU without matplotlib.
+    Uses h264_videotoolbox for hardware video encoding on Mac.
+
+    Returns total frames rendered.
+    """
+    import subprocess
+    from mlx_vis.render import render_frame
+
+    snapshots_np = [np.asarray(s) for s in snapshots]
+    n_snap = len(snapshots_np)
+    n_points = len(snapshots_np[0])
+    n_epochs = n_snap - 1
+
+    c = _resolve_colors(labels, colors, n_points, theme)
+    c = np.array(c, dtype=np.float32)
+    c[:, 3] = alpha
+
+    xlim, ylim = _get_square_lims(snapshots_np[-1])
+
+    bg_val = 0.0 if theme == "dark" else 1.0
+    bg = np.array([bg_val, bg_val, bg_val, 1.0], dtype=np.float32)
+
+    point_radius = max(1.0, point_size)
+
+    init_f = int(init_hold * fps)
+    hold_f = int(end_hold * fps)
+    total_f = init_f + n_snap + hold_f
 
     ffmpeg_cmd = [
         "ffmpeg", "-y",
-        "-f", "rawvideo",
-        "-pix_fmt", "rgba",
-        "-s", f"{width}x{height}",
-        "-r", str(fps),
+        "-f", "rawvideo", "-pix_fmt", "rgba",
+        "-s", f"{width}x{height}", "-r", str(fps),
         "-i", "pipe:",
         "-c:v", "h264_videotoolbox",
         "-b:v", f"{bitrate}k",
@@ -220,7 +285,6 @@ def animate(snapshots, labels=None, timestamps=None, method_name="",
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     for frame_i in range(total_f):
-        # determine snapshot index
         if frame_i < init_f:
             idx = 0
         elif frame_i < init_f + n_snap:
@@ -228,12 +292,10 @@ def animate(snapshots, labels=None, timestamps=None, method_name="",
         else:
             idx = n_snap - 1
 
-        # render
-        frame = render_frame(snapshots_mx[idx], colors_mx, width, height,
+        frame = render_frame(snapshots_np[idx], c, width, height,
                              xlim, ylim, point_radius=point_radius,
                              bg_color=bg)
-        mx.eval(frame)
-        proc.stdin.write(np.array(frame, copy=False).tobytes())
+        proc.stdin.write(frame.tobytes())
 
         if (frame_i + 1) % 100 == 0 or frame_i == total_f - 1:
             print(f"  frame {frame_i + 1}/{total_f}")
