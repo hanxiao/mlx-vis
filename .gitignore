@@ -1,9 +1,3 @@
-# Copied submodule sources (generated at build time)
-mlx_vis/_umap/
-mlx_vis/_tsne/
-mlx_vis/_pacmap/
-mlx_vis/_nndescent/
-
 # Python
 __pycache__/
 *.pyc
