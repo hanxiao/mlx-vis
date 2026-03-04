@@ -7,4 +7,6 @@ from mlx_vis._tsne.tsne import TSNE
 from mlx_vis._pacmap.pacmap import PaCMAP
 from mlx_vis._nndescent.nndescent import NNDescent
 
-__all__ = ["UMAP", "TSNE", "PaCMAP", "NNDescent"]
+from mlx_vis.plot import scatter, animate
+
+__all__ = ["UMAP", "TSNE", "PaCMAP", "NNDescent", "scatter", "animate"]

@@ -240,14 +240,16 @@ class PaCMAP:
             self._log("X normalized")
             return mx.array(X_np)
     
-    def fit_transform(self, X, init="pca"):
+    def fit_transform(self, X, init="pca", epoch_callback=None):
         """Fit and return the low-dimensional embedding.
-        
+
         Parameters
         ----------
         X : numpy.ndarray of shape (n_samples, n_features)
         init : str, default="pca"
-        
+        epoch_callback : callable, optional
+            Called as epoch_callback(epoch, Y_numpy) at init and each iteration.
+
         Returns
         -------
         Y : numpy.ndarray of shape (n_samples, n_components)
@@ -343,6 +345,9 @@ class PaCMAP:
         src_fp = mx.array(pair_FP[:, 0])
         dst_fp = mx.array(pair_FP[:, 1])
         
+        if epoch_callback is not None:
+            epoch_callback(0, np.array(Y))
+
         self._log("Starting optimization...")
         
         # Pre-extract column slices as contiguous arrays to avoid repeated indexing
@@ -425,9 +430,12 @@ class PaCMAP:
                 lr_t = lr * math.sqrt(1.0 - beta2 ** (itr + 1)) / (1.0 - beta1 ** (itr + 1))
                 Y, m, v = step_no_mn_c(Y, m, v, 1.0, 1.0, lr_t)
             
-            if (itr + 1) % 10 == 0:
+            if epoch_callback is not None:
                 mx.eval(Y, m, v)
-        
+                epoch_callback(itr + 1, np.array(Y))
+            elif (itr + 1) % 10 == 0:
+                mx.eval(Y, m, v)
+
         mx.eval(Y)
         elapsed = time.time() - start_time
         self._log(f"Elapsed time: {elapsed:.2f}s")
