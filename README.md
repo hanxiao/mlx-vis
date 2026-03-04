@@ -1,6 +1,6 @@
 # mlx-vis
 
-Pure MLX implementations of UMAP, t-SNE, PaCMAP, and NNDescent for Apple Silicon. Metal GPU acceleration for both computation and video rendering. No scipy, no sklearn, no matplotlib.
+Pure MLX implementations of UMAP, t-SNE, PaCMAP, TriMap, and NNDescent for Apple Silicon. Metal GPU acceleration for both computation and video rendering. No scipy, no sklearn, no matplotlib.
 
 ![Fashion-MNIST 70K, 500 iterations on M3 Ultra](comparison.png)
 
@@ -24,7 +24,7 @@ Requires `mlx >= 0.20.0` and `numpy >= 1.24.0`.
 
 ```python
 import numpy as np
-from mlx_vis import UMAP, TSNE, PaCMAP, NNDescent
+from mlx_vis import UMAP, TSNE, PaCMAP, TriMap, NNDescent
 
 X = np.random.randn(10000, 128).astype(np.float32)
 
@@ -36,6 +36,9 @@ Y = TSNE(n_components=2, perplexity=30).fit_transform(X)
 
 # PaCMAP
 Y = PaCMAP(n_components=2, n_neighbors=10).fit_transform(X)
+
+# TriMap
+Y = TriMap(n_components=2, n_iters=400).fit_transform(X)
 
 # NNDescent (approximate k-NN graph)
 indices, distances = NNDescent(k=15).build(X)
@@ -57,6 +60,7 @@ from mlx_vis.nndescent import NNDescent
 | UMAP | `UMAP(n_components, n_neighbors, min_dist, ...)` | `fit_transform(X)` | `np.ndarray (n, d)` |
 | t-SNE | `TSNE(n_components, perplexity, ...)` | `fit_transform(X)` | `np.ndarray (n, d)` |
 | PaCMAP | `PaCMAP(n_components, n_neighbors, ...)` | `fit_transform(X)` | `np.ndarray (n, d)` |
+| TriMap | `TriMap(n_components, n_iters, ...)` | `fit_transform(X)` | `np.ndarray (n, d)` |
 | NNDescent | `NNDescent(k, n_iters, ...)` | `build(X)` | `(indices, distances)` |
 
 ## Visualization
@@ -92,14 +96,18 @@ https://github.com/user-attachments/assets/b8a4840b-7e71-4992-a26b-8332666af52a
 
 https://github.com/user-attachments/assets/563c6a58-48e8-435d-b99d-5eafbb11be27
 
+**TriMap:**
+
+https://github.com/user-attachments/assets/eea51acf-b8da-4da1-9b23-6322bf300275
+
 **Benchmark on Fashion-MNIST 70,000 x 784, M3 Ultra:**
 
-| | UMAP | t-SNE | PaCMAP |
-|---|---|---|---|
-| Iterations | 500 | 500 | 450 |
-| Embedding | 3.5s | 3.9s | 2.4s |
-| GPU render (800 frames) | 1.4s | 1.3s | 1.2s |
-| Total | 4.9s | 5.2s | 3.6s |
+| | UMAP | t-SNE | PaCMAP | TriMap |
+|---|---|---|---|---|
+| Iterations | 500 | 500 | 450 | 500 |
+| Embedding | 3.5s | 3.9s | 2.4s | 2.8s |
+| GPU render (800 frames) | 2.1s | 1.9s | 1.8s | 1.9s |
+| Total | 5.6s | 5.8s | 4.2s | 4.7s |
 
 ```python
 from mlx_vis import UMAP, animate
