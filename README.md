@@ -2,7 +2,7 @@
 
 Pure MLX implementations of UMAP, t-SNE, PaCMAP, TriMap, DREAMS, CNE, and NNDescent for Apple Silicon. Metal GPU acceleration for both computation and video rendering. No scipy, no sklearn, no matplotlib.
 
-![Fashion-MNIST 70K on M3 Ultra](comparison.png)
+![Fashion-MNIST 70K on M3 Ultra](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/comparison.png)
 
 ## Install
 
