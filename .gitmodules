@@ -1,0 +1,12 @@
+[submodule "libs/umap-mlx"]
+	path = libs/umap-mlx
+	url = https://github.com/hanxiao/umap-mlx.git
+[submodule "libs/tsne-mlx"]
+	path = libs/tsne-mlx
+	url = https://github.com/hanxiao/tsne-mlx.git
+[submodule "libs/pacmap-mlx"]
+	path = libs/pacmap-mlx
+	url = https://github.com/hanxiao/pacmap-mlx.git
+[submodule "libs/nndescent-mlx"]
+	path = libs/nndescent-mlx
+	url = https://github.com/hanxiao/nndescent-mlx.git

@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mlx-vis"
+version = "0.1.0"
+description = "Unified dimensionality reduction on Apple Silicon: UMAP, t-SNE, PaCMAP, NNDescent, PCA - all in MLX."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+authors = [{ name = "Han Xiao" }]
+dependencies = [
+    "mlx>=0.20.0",
+    "numpy>=1.24.0",
+]
+
+[project.urls]
+Repository = "https://github.com/hanxiao/mlx-vis"
+
+[tool.setuptools.packages.find]
+include = ["mlx_vis*"]
