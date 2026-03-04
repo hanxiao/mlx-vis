@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mlx-vis"
 version = "0.1.0"
-description = "Pure MLX + NumPy implementations of UMAP, t-SNE, PaCMAP, and NNDescent for Apple Silicon."
+description = "Pure MLX implementations of UMAP, t-SNE, PaCMAP, and NNDescent for Apple Silicon. Metal GPU acceleration for both computation and video rendering."
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"

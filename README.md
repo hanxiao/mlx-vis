@@ -1,6 +1,6 @@
 # mlx-vis
 
-Pure MLX + NumPy implementations of UMAP, t-SNE, PaCMAP, and NNDescent for Apple Silicon. No scipy, no sklearn - just Metal GPU acceleration via MLX.
+Pure MLX implementations of UMAP, t-SNE, PaCMAP, and NNDescent for Apple Silicon. Metal GPU acceleration for both computation and video rendering. No scipy, no sklearn.
 
 ![Fashion-MNIST 70K, 500 iterations on M3 Ultra](comparison.png)
 
@@ -74,9 +74,9 @@ Y = UMAP(n_components=2).fit_transform(X)
 scatter(Y, labels=labels, theme="dark", save="plot.png")
 ```
 
-### GPU-accelerated animation
+### GPU-accelerated video rendering
 
-`animate_gpu` renders directly on Metal GPU via MLX circle-splatting, then pipes raw RGBA frames to ffmpeg with `h264_videotoolbox` hardware encoding. No matplotlib in the rendering loop. 500 frames of 15K points render in ~1.5 seconds on M3 Ultra (60x faster than matplotlib).
+All rendering runs on Metal GPU via MLX: coordinate mapping, circle-splatting, and color blending are fully vectorized MLX operations. Raw RGBA frames are piped to ffmpeg with `h264_videotoolbox` hardware encoding. Zero CPU rendering, zero matplotlib. **500 frames of 15K points in 1.5 seconds** on M3 Ultra, 60x faster than matplotlib.
 
 **UMAP:**
 
