@@ -13,7 +13,7 @@ uv pip install mlx-vis
 From source:
 
 ```bash
-git clone --recurse-submodules https://github.com/hanxiao/mlx-vis.git
+git clone https://github.com/hanxiao/mlx-vis.git
 cd mlx-vis
 uv pip install .
 ```
