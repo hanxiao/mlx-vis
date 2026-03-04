@@ -5,7 +5,7 @@ Dimensionality reduction on Apple Silicon. UMAP, t-SNE, PaCMAP, NNDescent, and P
 ## Install
 
 ```bash
-pip install mlx-vis
+uv pip install mlx-vis
 ```
 
 From source:
@@ -13,7 +13,7 @@ From source:
 ```bash
 git clone --recurse-submodules https://github.com/hanxiao/mlx-vis.git
 cd mlx-vis
-pip install .
+uv pip install .
 ```
 
 ## Usage

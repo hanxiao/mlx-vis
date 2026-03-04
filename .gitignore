@@ -12,3 +12,6 @@ dist/
 build/
 .eggs/
 *.egg
+.venv/
+uv.lock
+.python-version
