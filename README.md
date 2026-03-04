@@ -82,15 +82,15 @@ Video frames are rendered on GPU and piped to ffmpeg with `h264_videotoolbox` ha
 
 **UMAP:**
 
-https://github.com/user-attachments/assets/d1f7e982-9eb2-4e89-b1f6-48e94473655a
+https://github.com/user-attachments/assets/547b8ce2-17d4-4172-be59-ba83eafd1785
 
 **t-SNE:**
 
-https://github.com/user-attachments/assets/57f15a03-ee2f-4bdc-bc22-0b8042c3d1e7
+https://github.com/user-attachments/assets/b8a4840b-7e71-4992-a26b-8332666af52a
 
 **PaCMAP:**
 
-https://github.com/user-attachments/assets/1c48749a-28f4-41b2-a70f-8cfdc25a03c4
+https://github.com/user-attachments/assets/563c6a58-48e8-435d-b99d-5eafbb11be27
 
 **Benchmark on Fashion-MNIST 70,000 x 784, M3 Ultra:**
 
