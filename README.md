@@ -1,6 +1,6 @@
 # mlx-vis
 
-Dimensionality reduction on Apple Silicon. UMAP, t-SNE, PaCMAP, NNDescent, and PCA - all running on Metal via MLX.
+Dimensionality reduction on Apple Silicon. UMAP, t-SNE, PaCMAP, and NNDescent - all running on Metal via MLX.
 
 ## Install
 
@@ -20,7 +20,7 @@ uv pip install .
 
 ```python
 import numpy as np
-from mlx_vis import UMAP, TSNE, PaCMAP, NNDescent, PCA
+from mlx_vis import UMAP, TSNE, PaCMAP, NNDescent
 
 X = np.random.randn(10000, 128).astype(np.float32)
 
@@ -33,9 +33,6 @@ Y = TSNE(n_components=2, perplexity=30).fit_transform(X)
 # PaCMAP
 Y = PaCMAP(n_components=2, n_neighbors=10).fit_transform(X)
 
-# PCA
-Y = PCA(n_components=2).fit_transform(X)
-
 # NNDescent (approximate k-NN graph)
 indices, distances = NNDescent(k=15).build(X)
 ```
@@ -47,7 +44,6 @@ from mlx_vis.umap import UMAP
 from mlx_vis.tsne import TSNE
 from mlx_vis.pacmap import PaCMAP
 from mlx_vis.nndescent import NNDescent
-from mlx_vis.pca import PCA
 ```
 
 ## Methods
@@ -57,7 +53,6 @@ from mlx_vis.pca import PCA
 | UMAP | `UMAP(n_components, n_neighbors, min_dist, ...)` | `fit_transform(X)` | `np.ndarray (n, d)` |
 | t-SNE | `TSNE(n_components, perplexity, ...)` | `fit_transform(X)` | `np.ndarray (n, d)` |
 | PaCMAP | `PaCMAP(n_components, n_neighbors, ...)` | `fit_transform(X)` | `np.ndarray (n, d)` |
-| PCA | `PCA(n_components)` | `fit_transform(X)` | `np.ndarray (n, d)` |
 | NNDescent | `NNDescent(k, n_iters, ...)` | `build(X)` | `(indices, distances)` |
 
 ## Dependencies
