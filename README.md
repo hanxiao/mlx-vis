@@ -102,7 +102,7 @@ https://github.com/user-attachments/assets/1c48749a-28f4-41b2-a70f-8cfdc25a03c4
 | Total | 4.9s | 5.2s | 3.6s |
 
 ```python
-from mlx_vis import UMAP, animate_gpu
+from mlx_vis import UMAP, animate
 import numpy as np, time
 
 X = np.random.randn(10000, 128).astype(np.float32)
@@ -116,12 +116,10 @@ def cb(epoch, Y_np):
 
 Y = UMAP(n_components=2, n_epochs=200).fit_transform(X, epoch_callback=cb)
 
-animate_gpu(snaps, labels=labels, timestamps=times,
-            method_name="umap-mlx", fps=120, theme="dark",
-            save="animation.mp4")
+animate(snaps, labels=labels, timestamps=times,
+        method_name="umap-mlx", fps=120, theme="dark",
+        save="animation.mp4")
 ```
-
-The CPU fallback `animate()` uses matplotlib and is available for non-Mac platforms.
 
 Full Fashion-MNIST example:
 
