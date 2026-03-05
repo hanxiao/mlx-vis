@@ -1,5 +1,8 @@
 # mlx-vis
 
+[![arXiv](https://img.shields.io/badge/arXiv-2603.04035-b31b1b.svg)](https://arxiv.org/abs/2603.04035)
+[![PyPI](https://img.shields.io/pypi/v/mlx-vis.svg)](https://pypi.org/project/mlx-vis/)
+
 Pure MLX implementations of UMAP, t-SNE, PaCMAP, TriMap, DREAMS, CNE, and NNDescent for Apple Silicon. Metal GPU acceleration for both computation and video rendering. No scipy, no sklearn, no matplotlib.
 
 Embed 70K points in **2-4 seconds**. Add GPU-rendered animation video in under **5 seconds** total. See [benchmark](#benchmark).

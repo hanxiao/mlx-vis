@@ -37,7 +37,7 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/hanxiao/mlx-vis"
+Homepage = "https://arxiv.org/abs/2603.04035"
 Repository = "https://github.com/hanxiao/mlx-vis"
 Issues = "https://github.com/hanxiao/mlx-vis/issues"
 
