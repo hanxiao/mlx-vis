@@ -259,7 +259,10 @@ def animate_gpu(snapshots, labels=None, timestamps=None, method_name="",
     c = np.array(c, dtype=np.float32)
     c[:, 3] = alpha
 
-    xlim, ylim = _get_square_lims(snapshots_np[-1])
+    # Use global limits across ALL frames (not just the last one).
+    # This is critical for FlowMatch where source and target have different ranges.
+    all_points = np.concatenate(snapshots_np, axis=0)
+    xlim, ylim = _get_square_lims(all_points)
 
     bg_val = 0.0 if theme == "dark" else 1.0
 
@@ -336,6 +339,150 @@ def animate_gpu(snapshots, labels=None, timestamps=None, method_name="",
 
     print(f"  frame {total_f}/{total_f}")
 
+    proc.stdin.close()
+    proc.wait()
+
+    return total_f
+
+
+def morph_gpu(Y_source, Y_target, labels=None, n_steps=300,
+              fps=60, theme="dark", colors=None, point_size=2, alpha=1.0,
+              init_hold=1.0, end_hold=2.0, save="morph.mp4",
+              width=1000, height=1000, bitrate=8000):
+    """Smooth morphing animation between two paired 2D embeddings.
+
+    Procrustes-aligns both embeddings (center, scale, rotate) then
+    generates intermediate frames via linear interpolation on GPU.
+    All computation (interpolation + rendering) runs on Metal GPU.
+
+    Parameters
+    ----------
+    Y_source : array-like (n, 2)
+        Source embedding (e.g. UMAP output).
+    Y_target : array-like (n, 2)
+        Target embedding (e.g. t-SNE output). Must be paired with source:
+        Y_source[i] and Y_target[i] correspond to the same input sample.
+    labels : array-like (n,), optional
+        Integer labels for coloring.
+    n_steps : int
+        Number of interpolation steps (default 300).
+    fps : int
+        Frames per second (default 60).
+    save : str
+        Output video path.
+
+    Returns
+    -------
+    int : total frames rendered.
+    """
+    import subprocess
+    import mlx.core as mx
+    from mlx_vis.render import _render_frame_mlx, _circle_template, _TEMPLATE_CACHE
+
+    # --- Procrustes alignment ---
+    X0 = np.asarray(Y_source, dtype=np.float64)
+    X1 = np.asarray(Y_target, dtype=np.float64)
+    n = len(X0)
+
+    # Center
+    X0 = X0 - X0.mean(axis=0)
+    X1 = X1 - X1.mean(axis=0)
+
+    # Per-axis unit std
+    X0 = X0 / np.maximum(X0.std(axis=0), 1e-8)
+    X1 = X1 / np.maximum(X1.std(axis=0), 1e-8)
+
+    # Optimal rotation via SVD
+    M = X0.T @ X1
+    U, _, Vt = np.linalg.svd(M)
+    d = np.linalg.det(U @ Vt)
+    R = U @ np.diag([1.0, d]) @ Vt
+    X1 = X1 @ R.T
+
+    # --- Setup rendering ---
+    X0_mx = mx.array(X0.astype(np.float32))
+    X1_mx = mx.array(X1.astype(np.float32))
+
+    # Global limits from both endpoints
+    all_pts = np.concatenate([X0, X1], axis=0).astype(np.float32)
+    xlim, ylim = _get_square_lims(all_pts)
+
+    c = _resolve_colors(labels, colors, n, theme)
+    c = np.array(c, dtype=np.float32)
+    c[:, 3] = alpha
+
+    bg_val = 0.0 if theme == "dark" else 1.0
+    colors_mx = mx.array(c)
+    bg_mx = mx.array([bg_val, bg_val, bg_val, 1.0], dtype=mx.float32)
+    xmin, xmax = float(xlim[0]), float(xlim[1])
+    ymin, ymax = float(ylim[0]), float(ylim[1])
+
+    point_radius = max(1.0, point_size)
+    rk = round(point_radius * 10)
+    if rk not in _TEMPLATE_CACHE:
+        _TEMPLATE_CACHE[rk] = _circle_template(point_radius)
+    offsets, weights = _TEMPLATE_CACHE[rk]
+
+    init_f = int(init_hold * fps)
+    hold_f = int(end_hold * fps)
+    total_f = init_f + (n_steps + 1) + hold_f
+
+    def _render_interp(t):
+        """Interpolate and render on GPU."""
+        t_mx = mx.array(t, dtype=mx.float32)
+        Y = (1.0 - t_mx) * X0_mx + t_mx * X1_mx
+        return _render_frame_mlx(Y, colors_mx, offsets, weights,
+                                 width, height, xmin, xmax, ymin, ymax, bg_mx)
+
+    # --- Encode video ---
+    ffmpeg_cmd = [
+        "ffmpeg", "-y",
+        "-f", "rawvideo", "-pix_fmt", "rgba",
+        "-s", f"{width}x{height}", "-r", str(fps),
+        "-i", "pipe:",
+        "-c:v", "h264_videotoolbox",
+        "-b:v", f"{bitrate}k",
+        "-pix_fmt", "yuv420p",
+        save,
+    ]
+    proc = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE,
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    # Init hold
+    frame0 = _render_interp(0.0)
+    mx.eval(frame0)
+    buf0 = np.array(frame0).tobytes()
+    for _ in range(init_f):
+        proc.stdin.write(buf0)
+
+    # Interpolation frames with GPU pipeline
+    proc.stdin.write(buf0)  # step 0
+    if n_steps > 0:
+        frame = _render_interp(1.0 / n_steps)
+        mx.async_eval(frame)
+
+        for step in range(2, n_steps + 1):
+            t = step / n_steps
+            next_frame = _render_interp(t)
+            mx.async_eval(next_frame)
+            mx.eval(frame)
+            proc.stdin.write(np.array(frame).tobytes())
+            frame = next_frame
+            done = init_f + step
+            if done % 100 == 0:
+                print(f"  frame {done}/{total_f}")
+
+        mx.eval(frame)
+        last_bytes = np.array(frame).tobytes()
+        proc.stdin.write(last_bytes)
+    else:
+        last_bytes = buf0
+
+    # End hold
+    for _ in range(hold_f):
+        proc.stdin.write(last_bytes)
+
+    print(f"  frame {total_f}/{total_f}")
     proc.stdin.close()
     proc.wait()
 
