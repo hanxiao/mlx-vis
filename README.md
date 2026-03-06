@@ -15,7 +15,7 @@ Fashion-MNIST 70K on M3 Ultra:
 | **TriMap** | **DREAMS** | **CNE** |
 | ![TriMap](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/trimap.png) | ![DREAMS](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/dreams.png) | ![CNE](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/cne.png) |
 
-Just for fun -- `morph_gpu` smoothly interpolates between all six methods with Procrustes alignment, comet trails, and ease-in-out timing. 70K points, rendered at 421 fps on M3 Ultra:
+Just for fun -- `morph_gpu` smoothly interpolates between all six methods:
 
 https://github.com/user-attachments/assets/b11418e0-51f6-4a73-8150-8a40097662cc
 
