@@ -54,6 +54,7 @@ class CNE:
         pca_dim=50,
         random_state=None,
         verbose=False,
+        knn_method: str = "auto",
     ):
         if loss not in ("infonce", "nce", "neg"):
             raise ValueError(f"Unknown loss: {loss!r}. Use 'infonce', 'nce', or 'neg'.")
@@ -67,6 +68,7 @@ class CNE:
         self.pca_dim = pca_dim
         self.random_state = random_state
         self.verbose = verbose
+        self.knn_method = knn_method
         self.embedding_ = None
 
     def fit_transform(self, X, epoch_callback=None):
@@ -95,16 +97,15 @@ class CNE:
             X = self._pca_reduce(X, n, dim)
             dim = X.shape[1]
 
-        # k-NN via NNDescent
+        # k-NN
         if self.verbose:
             print("Computing k-NN...")
         t_knn = time.time()
-        nn = NNDescent(
-            k=self.n_neighbors,
-            verbose=self.verbose,
-            random_state=self.random_state if self.random_state is not None else 42,
+        from mlx_vis._knn import compute_knn
+        knn_indices, _ = compute_knn(
+            X, self.n_neighbors, method=self.knn_method,
+            verbose=self.verbose, random_state=self.random_state if self.random_state is not None else 42,
         )
-        knn_indices, _ = nn.build(X)
         if self.verbose:
             print(f"k-NN done in {time.time() - t_knn:.1f}s")
 

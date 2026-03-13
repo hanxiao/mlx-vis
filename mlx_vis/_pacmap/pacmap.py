@@ -181,6 +181,7 @@ class PaCMAP:
         random_state=None,
         verbose=False,
         apply_pca=True,
+        knn_method: str = "auto",
     ):
         self.n_components = n_components
         self.n_neighbors = n_neighbors
@@ -194,6 +195,7 @@ class PaCMAP:
         self.random_state = random_state
         self.verbose = verbose
         self.apply_pca = apply_pca
+        self.knn_method = knn_method
         self.embedding_ = None
     
     def _log(self, msg):
@@ -277,9 +279,11 @@ class PaCMAP:
         # KNN
         self._log("Computing KNN...")
         t0 = time.time()
-        knn_indices, knn_distances = _brute_knn(X_mx, n_neighbors + 50)
-        knn_indices_np = np.array(knn_indices, dtype=np.int32)
-        knn_distances_np = np.array(knn_distances, dtype=np.float32)
+        from mlx_vis._knn import compute_knn
+        knn_indices_np, knn_distances_np = compute_knn(
+            np.array(X_mx), n_neighbors + 50, method=self.knn_method,
+            verbose=self.verbose, random_state=self.random_state,
+        )
         self._log(f"KNN done in {time.time()-t0:.1f}s")
         
         # Sample pairs (all in numpy, pre-computed)

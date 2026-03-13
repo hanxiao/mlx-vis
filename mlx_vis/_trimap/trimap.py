@@ -55,6 +55,7 @@ class TriMap:
         pca_dim=100,
         random_state=None,
         verbose=False,
+        knn_method: str = "auto",
     ):
         self.n_components = n_components
         self.n_neighbors = n_neighbors
@@ -67,6 +68,7 @@ class TriMap:
         self.pca_dim = pca_dim
         self.random_state = random_state
         self.verbose = verbose
+        self.knn_method = knn_method
 
     def fit_transform(self, X, epoch_callback=None):
         """Compute TriMap embedding.
@@ -109,16 +111,15 @@ class TriMap:
             X = np.array(X_pca)
             dim = self.pca_dim
 
-        # k-NN via NNDescent
+        # k-NN
         if self.verbose:
             print("Computing k-NN...")
         t_knn = time.time()
-        nn = NNDescent(
-            k=self.n_neighbors,
-            verbose=self.verbose,
-            random_state=self.random_state if self.random_state is not None else 42,
+        from mlx_vis._knn import compute_knn
+        knn_indices, knn_distances = compute_knn(
+            X, self.n_neighbors, method=self.knn_method,
+            verbose=self.verbose, random_state=self.random_state if self.random_state is not None else 42,
         )
-        knn_indices, knn_distances = nn.build(X)
         # knn_indices: (n, k) sorted neighbor indices (no self)
         # knn_distances: (n, k) Euclidean distances, sorted ascending
         if self.verbose:

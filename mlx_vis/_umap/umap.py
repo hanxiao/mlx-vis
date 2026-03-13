@@ -52,6 +52,7 @@ class UMAP:
         random_state: int | None = None,
         verbose: bool = False,
         pca_dim: int | None = None,
+        knn_method: str = "auto",
     ):
         self.n_components = n_components
         self.n_neighbors = n_neighbors
@@ -63,6 +64,7 @@ class UMAP:
         self.random_state = random_state
         self.verbose = verbose
         self.pca_dim = pca_dim
+        self.knn_method = knn_method
         self.embedding_ = None
 
     def fit_transform(self, X, epoch_callback=None) -> np.ndarray:
@@ -103,7 +105,11 @@ class UMAP:
 
         if self.verbose:
             print("Computing nearest neighbors...")
-        knn_indices, knn_dists = self._compute_knn(X_for_knn)
+        from mlx_vis._knn import compute_knn
+        knn_indices, knn_dists = compute_knn(
+            X_for_knn, self.n_neighbors, method=self.knn_method,
+            verbose=self.verbose, random_state=self.random_state,
+        )
 
         if self.n_epochs is None:
             self.n_epochs = 500 if n <= 10000 else 200

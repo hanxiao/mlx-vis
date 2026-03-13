@@ -44,6 +44,7 @@ class DREAMS:
         pca_dim: int | None = 50,
         random_state: int | None = None,
         verbose: int = 0,
+        knn_method: str = "auto",
     ):
         self.n_components = n_components
         self.perplexity = perplexity
@@ -55,6 +56,7 @@ class DREAMS:
         self.pca_dim = pca_dim
         self.random_state = random_state
         self.verbose = verbose
+        self.knn_method = knn_method
         self.embedding_ = None
 
     def fit_transform(self, X, epoch_callback=None) -> np.ndarray:
@@ -81,9 +83,13 @@ class DREAMS:
 
         # KNN
         k = min(int(3 * self.perplexity), n - 1)
-        X_mx = mx.array(X_for_knn)
-        knn_indices, knn_dists = _chunked_knn(X_mx, k)
-        mx.eval(knn_indices, knn_dists)
+        from mlx_vis._knn import compute_knn
+        knn_indices, knn_dists = compute_knn(
+            X_for_knn, k, method=self.knn_method,
+            verbose=bool(self.verbose), random_state=self.random_state,
+            return_euclidean=False,
+        )
+        knn_indices, knn_dists = mx.array(knn_indices), mx.array(knn_dists)
 
         # Build P matrix
         edge_from, edge_to, edge_weights = self._build_p(knn_indices, knn_dists, n)
