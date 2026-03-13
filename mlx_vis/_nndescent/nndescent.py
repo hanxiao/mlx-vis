@@ -19,7 +19,7 @@ class NNDescent:
         k: int = 15,
         n_iters: int = 20,
         max_candidates: int | None = None,
-        delta: float = 0.001,
+        delta: float = 0.015,
         random_state: int | None = None,
         verbose: bool = False,
     ):
@@ -59,71 +59,71 @@ class NNDescent:
         # Initial distances
         dists = _gather_dists(X, sq_norms, indices)  # (n, k)
 
-        # flags: 1 = new, 0 = old
-        flags = mx.ones((n, k), dtype=mx.uint8)
-
         # Sort
         si = mx.argsort(dists, axis=1)
         indices = mx.take_along_axis(indices, si, axis=1)
         dists = mx.take_along_axis(dists, si, axis=1)
-        mx.eval(indices, dists, flags, sq_norms)
+        mx.eval(indices, dists, sq_norms)
 
         t0 = time.time()
+        update_frac = 1.0  # initialize before first iteration
         for it in range(self.n_iters):
             # ---- Build candidates via forward + reverse edges ----
             # Forward: each (i, indices[i,j]) is an edge with flag[i,j]
             # Reverse: each (indices[i,j], i) is also a candidate
 
-            # For each point, gather neighbors-of-neighbors as candidates
-            # Cap the number of neighbors used to limit memory: O(n * mc * mc)
-            mc_nn = min(k, mc)
+            # For each point, gather neighbors-of-neighbors as candidates.
+            # Adaptively reduce mc_nn as graph converges: fewer new candidates needed.
+            # Scale mc_nn by sqrt(update_frac): 100% updates -> mc_nn=k, 1% -> mc_nn=k/2
+            mc_nn = max(3, int(min(k, mc) * min(1.0, update_frac ** 0.5 * 3)))
             nn_sub = indices[:, :mc_nn]  # (n, mc_nn)
             nn_of_nn = indices[nn_sub.reshape(-1)].reshape(n, mc_nn, k)  # (n, mc_nn, k)
 
             # Reverse candidates: for edge (i -> j), i is a candidate for j
-            # Pure MLX: sort edges by dst, compute within-group position, scatter
-            src_all = mx.broadcast_to(mx.arange(n)[:, None], (n, k)).reshape(-1)
-            dst_all = indices.reshape(-1)
+            # Skip when nearly converged (update_frac < 0.10) - saves argsort(n*k)
+            if update_frac >= 0.10:
+                src_all = mx.broadcast_to(mx.arange(n)[:, None], (n, k)).reshape(-1)
+                dst_all = indices.reshape(-1)
 
-            rev_order = mx.argsort(dst_all)
-            rev_src = src_all[rev_order]
-            rev_dst = dst_all[rev_order]
+                rev_order = mx.argsort(dst_all)
+                rev_src = src_all[rev_order]
+                rev_dst = dst_all[rev_order]
 
-            # Within-group position via cumsum trick
-            is_new_group = mx.concatenate([
-                mx.ones((1,), dtype=mx.int32),
-                (rev_dst[1:] != rev_dst[:-1]).astype(mx.int32)
-            ])
-            # Running count within each group
-            global_pos = mx.arange(n * k)
-            group_start_markers = mx.where(is_new_group.astype(mx.bool_), global_pos, 0)
-            # Forward-fill group starts using cummax
-            group_starts = mx.cummax(group_start_markers)
-            within_pos = global_pos - group_starts
+                # Within-group position via cumsum trick
+                is_new_group = mx.concatenate([
+                    mx.ones((1,), dtype=mx.int32),
+                    (rev_dst[1:] != rev_dst[:-1]).astype(mx.int32)
+                ])
+                # Running count within each group
+                global_pos = mx.arange(n * k)
+                group_start_markers = mx.where(is_new_group.astype(mx.bool_), global_pos, 0)
+                # Forward-fill group starts using cummax
+                group_starts = mx.cummax(group_start_markers)
+                within_pos = global_pos - group_starts
 
-            # Keep only first k per group, scatter into (n, k) array
-            keep = within_pos < k
-            flat_idx = rev_dst * k + within_pos
-            flat_idx = mx.where(keep, flat_idx, 0)
-            rev_src_kept = mx.where(keep, rev_src, 0)
+                # Keep only first k per group, scatter into (n, k) array
+                keep = within_pos < k
+                flat_idx = rev_dst * k + within_pos
+                flat_idx = mx.where(keep, flat_idx, 0)
+                rev_src_kept = mx.where(keep, rev_src, 0)
 
-            rev_cands = mx.zeros((n * k,), dtype=mx.int32).at[flat_idx].add(rev_src_kept).reshape(n, k)
+                rev_cands = mx.zeros((n * k,), dtype=mx.int32).at[flat_idx].add(rev_src_kept).reshape(n, k)
 
-            # Also gather reverse-of-reverse (2-hop reverse):
-            rev_sub = rev_cands[:, :mc_nn]  # (n, mc_nn)
-            rev_nn = indices[rev_sub.reshape(-1)].reshape(n, mc_nn, k)  # (n, mc_nn, k)
+                # New candidates only (skip current indices - reuse known dists)
+                new_cands = mx.concatenate([
+                    nn_of_nn.reshape(n, mc_nn * k),  # (n, mc_nn*k)
+                    rev_cands,                       # (n, k)
+                ], axis=1)
+            else:
+                # Converging: skip reverse candidates, use only nn-of-nn
+                new_cands = nn_of_nn.reshape(n, mc_nn * k)
 
-            # Combine: current(k) + nn-of-nn(mc_nn*k) + reverse(k) + rev_nn(mc_nn*k)
-            all_cands = mx.concatenate([
-                indices,                        # (n, k)
-                nn_of_nn.reshape(n, mc_nn * k),  # (n, mc_nn*k)
-                rev_cands,                       # (n, k)
-                rev_nn.reshape(n, mc_nn * k),    # (n, mc_nn*k)
-            ], axis=1)
-            total_c = all_cands.shape[1]
+            # Compute distances only for new candidates (reuse dists for current indices)
+            new_dists_comp = _gather_dists(X, sq_norms, new_cands)
 
-            # Compute distances to all candidates
-            all_dists = _gather_dists(X, sq_norms, all_cands)  # (n, total_c)
+            # Combine current neighbors (known dists) with new candidates
+            all_cands = mx.concatenate([indices, new_cands], axis=1)
+            all_dists = mx.concatenate([dists, new_dists_comp], axis=1)
 
             # Mask self-references
             self_mask = all_cands == mx.arange(n)[:, None]
@@ -140,30 +140,16 @@ class NNDescent:
             ], axis=1)
             sorted_d = mx.where(is_dup, 1e30, sorted_d)
 
-            # Unsort back
-            unsort = mx.argsort(cand_sort, axis=1)
-            all_dists = mx.take_along_axis(sorted_d, unsort, axis=1)
-
-            # Select top k
-            top_idx = mx.argpartition(all_dists, kth=k - 1, axis=1)[:, :k]
-            top_dists = mx.take_along_axis(all_dists, top_idx, axis=1)
+            # Select top k directly from sorted space (skip unsort)
+            top_idx = mx.argpartition(sorted_d, kth=k - 1, axis=1)[:, :k]
+            top_dists = mx.take_along_axis(sorted_d, top_idx, axis=1)
             sub_sort = mx.argsort(top_dists, axis=1)
             top_idx = mx.take_along_axis(top_idx, sub_sort, axis=1)
 
-            new_indices = mx.take_along_axis(all_cands, top_idx, axis=1)
-            new_dists = mx.take_along_axis(all_dists, top_idx, axis=1)
+            new_indices = mx.take_along_axis(sorted_c, top_idx, axis=1)
+            new_dists = mx.take_along_axis(sorted_d, top_idx, axis=1)
 
-            # Compute flags: mark entries that changed as "new"
-            # An entry is new if it wasn't in the previous neighbor set
-            new_flags = mx.ones((n, k), dtype=mx.uint8)
-            # Check each new neighbor against all old neighbors
-            # old_expanded: (n, 1, k), new_expanded: (n, k, 1)
-            # match if any old neighbor equals this new neighbor
-            matches = new_indices[:, :, None] == indices[:, None, :]  # (n, k, k)
-            was_old = mx.any(matches, axis=2)  # (n, k) True if was already a neighbor
-            new_flags = mx.where(was_old, mx.zeros_like(new_flags), new_flags)
-
-            mx.eval(new_indices, new_dists, new_flags)
+            mx.eval(new_indices, new_dists)
 
             # Count updates
             changed = int(mx.sum(new_indices != indices))
@@ -171,7 +157,6 @@ class NNDescent:
 
             indices = new_indices
             dists = new_dists
-            flags = new_flags
 
             if self.verbose:
                 elapsed = time.time() - t0
@@ -289,8 +274,8 @@ def _gather_dists(X, sq_norms, col_ids):
     n, c = col_ids.shape
     d = X.shape[1]
 
-    # Chunk to keep intermediate (cs, c, d) under ~500MB
-    max_cs = max(1, 125_000_000 // (c * d))
+    # Chunk to keep intermediate (cs, c, d) under ~2000MB
+    max_cs = max(1, 500_000_000 // (c * d))
     max_cs = min(max_cs, n)
 
     if max_cs >= n:
@@ -298,7 +283,7 @@ def _gather_dists(X, sq_norms, col_ids):
         flat = col_ids.reshape(-1)
         X_tgt = X[flat].reshape(n, c, d)
         X_src = X
-        dots = mx.matmul(X_src[:, None, :], mx.transpose(X_tgt, (0, 2, 1)))[:, 0, :]
+        dots = mx.einsum('id,icd->ic', X_src, X_tgt)
         return mx.maximum(sq_norms[:, None] + sq_norms[flat].reshape(n, c) - 2.0 * dots, 0.0)
 
     chunks = []
@@ -308,7 +293,7 @@ def _gather_dists(X, sq_norms, col_ids):
         flat = col_ids[s:e].reshape(-1)
         X_tgt = X[flat].reshape(cs, c, d)
         X_src = X[s:e]
-        dots = mx.matmul(X_src[:, None, :], mx.transpose(X_tgt, (0, 2, 1)))[:, 0, :]
+        dots = mx.einsum('id,icd->ic', X_src, X_tgt)
         chunk_d = mx.maximum(sq_norms[s:e][:, None] + sq_norms[flat].reshape(cs, c) - 2.0 * dots, 0.0)
         mx.eval(chunk_d)
         chunks.append(chunk_d)
