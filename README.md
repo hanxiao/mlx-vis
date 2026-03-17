@@ -3,7 +3,7 @@
 [![arXiv](https://img.shields.io/badge/arXiv-2603.04035-b31b1b.svg)](https://arxiv.org/abs/2603.04035)
 [![PyPI](https://img.shields.io/pypi/v/mlx-vis.svg)](https://pypi.org/project/mlx-vis/)
 
-Pure MLX implementations of UMAP, t-SNE, PaCMAP, TriMap, DREAMS, CNE, and NNDescent for Apple Silicon. Metal GPU acceleration for both computation and video rendering. No scipy, no sklearn, no matplotlib.
+Pure MLX implementations of UMAP, t-SNE, PaCMAP, LocalMAP, TriMap, DREAMS, CNE, and NNDescent for Apple Silicon. Metal GPU acceleration for both computation and video rendering. No scipy, no sklearn, no matplotlib.
 
 Embed 70K points in **2-4 seconds**. Add GPU-rendered animation video in under **5 seconds** total. See [benchmark](#benchmark).
 
@@ -15,7 +15,7 @@ Fashion-MNIST 70K on M3 Ultra:
 | **TriMap** | **DREAMS** | **CNE** |
 | ![TriMap](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/trimap.png) | ![DREAMS](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/dreams.png) | ![CNE](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/cne.png) |
 
-Just for fun -- `morph_gpu` smoothly interpolates between all six methods:
+Just for fun -- `morph_gpu` smoothly interpolates between the included methods:
 
 https://github.com/user-attachments/assets/b11418e0-51f6-4a73-8150-8a40097662cc
 
@@ -39,7 +39,7 @@ Requires `mlx >= 0.20.0` and `numpy >= 1.24.0`.
 
 ```python
 import numpy as np
-from mlx_vis import UMAP, TSNE, PaCMAP, TriMap, DREAMS, CNE, NNDescent
+from mlx_vis import UMAP, TSNE, PaCMAP, LocalMAP, TriMap, DREAMS, CNE, NNDescent
 
 X = np.random.randn(10000, 128).astype(np.float32)
 
@@ -51,6 +51,9 @@ Y = TSNE(n_components=2, perplexity=30).fit_transform(X)
 
 # PaCMAP
 Y = PaCMAP(n_components=2, n_neighbors=10).fit_transform(X)
+
+# LocalMAP (PaCMAP with local graph adjustment)
+Y = LocalMAP(n_components=2, n_neighbors=10, low_dist_thres=10.0).fit_transform(X)
 
 # TriMap
 Y = TriMap(n_components=2, n_iters=400).fit_transform(X)
@@ -77,6 +80,7 @@ Per-module imports also work:
 from mlx_vis.umap import UMAP
 from mlx_vis.tsne import TSNE
 from mlx_vis.pacmap import PaCMAP
+from mlx_vis.localmap import LocalMAP
 from mlx_vis.trimap import TriMap
 from mlx_vis.dreams import DREAMS
 from mlx_vis.cne import CNE
@@ -90,6 +94,7 @@ from mlx_vis.nndescent import NNDescent
 | UMAP | `UMAP(n_components, n_neighbors, min_dist, ...)` | `fit_transform(X)` | `np.ndarray (n, d)` |
 | t-SNE | `TSNE(n_components, perplexity, ...)` | `fit_transform(X)` | `np.ndarray (n, d)` |
 | PaCMAP | `PaCMAP(n_components, n_neighbors, ...)` | `fit_transform(X)` | `np.ndarray (n, d)` |
+| LocalMAP | `LocalMAP(n_components, n_neighbors, low_dist_thres, ...)` | `fit_transform(X)` | `np.ndarray (n, d)` |
 | TriMap | `TriMap(n_components, n_iters, ...)` | `fit_transform(X)` | `np.ndarray (n, d)` |
 | DREAMS | `DREAMS(n_components, lam, ...)` | `fit_transform(X)` | `np.ndarray (n, d)` |
 | CNE | `CNE(n_components, loss, n_negatives, ...)` | `fit_transform(X)` | `np.ndarray (n, d)` |
