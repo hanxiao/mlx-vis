@@ -239,8 +239,24 @@ def _resample_local_fp_pairs(pair_neighbors_np, pair_FP_np, Y_np, low_dist_thres
     return updated
 
 
+def _eigh_cpu(matrix_mx):
+    """Compute eigendecomposition on CPU with an MLX→NumPy fallback."""
+    linalg_eigh = getattr(mx.linalg, "eigh", None)
+    if linalg_eigh is not None:
+        eigvals, eigvecs = linalg_eigh(matrix_mx, stream=mx.cpu)
+        mx.eval(eigvals, eigvecs)
+        return eigvals, eigvecs
+
+    matrix_np = np.array(matrix_mx, dtype=np.float32)
+    eigvals_np, eigvecs_np = np.linalg.eigh(matrix_np)
+    eigvals = mx.array(eigvals_np.astype(np.float32))
+    eigvecs = mx.array(eigvecs_np.astype(np.float32))
+    mx.eval(eigvals, eigvecs)
+    return eigvals, eigvecs
+
+
 def _pca_init(X_mx, n_components):
-    """PCA initialisation via SVD in MLX."""
+    """PCA initialisation via covariance eigendecomposition or SVD."""
     mean = mx.mean(X_mx, axis=0, keepdims=True)
     X_centered = X_mx - mean
     # Use SVD on the centred data
@@ -248,7 +264,7 @@ def _pca_init(X_mx, n_components):
     n, d = X_centered.shape
     if n > d:
         cov = (X_centered.T @ X_centered) / (n - 1)
-        eigvals, eigvecs = mx.linalg.eigh(cov, stream=mx.cpu)
+        eigvals, eigvecs = _eigh_cpu(cov)
         # eigh returns ascending order, take last n_components
         idx = mx.argsort(eigvals)
         eigvecs = eigvecs[:, idx[-n_components:]]
@@ -415,8 +431,7 @@ class PaCMAP:
             # Compute top-100 components via covariance eigendecomposition
             cov = (X_mx.T @ X_mx) / (n - 1)
             mx.eval(cov)
-            eigvals, eigvecs = mx.linalg.eigh(cov, stream=mx.cpu)
-            mx.eval(eigvals, eigvecs)
+            eigvals, eigvecs = _eigh_cpu(cov)
             # Take top 100
             idx = mx.argsort(eigvals)[-100:]
             idx = idx[::-1]
