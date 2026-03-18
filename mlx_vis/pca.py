@@ -39,7 +39,14 @@ class PCA:
         self.mean_ = mx.mean(X, axis=0)
         X_centered = X - self.mean_
 
-        U, S, Vt = mx.linalg.svd(X_centered, stream=mx.cpu)
+        n, d = X_centered.shape
+        if n > d:
+            # n >> d: SVD on d x d covariance matrix (much faster)
+            cov = (X_centered.T @ X_centered) / (n - 1)
+            mx.eval(cov)
+            _, _, Vt = mx.linalg.svd(cov, stream=mx.cpu)
+        else:
+            _, _, Vt = mx.linalg.svd(X_centered, stream=mx.cpu)
 
         self.components_ = Vt[: self.n_components]
         Y = X_centered @ self.components_.T
