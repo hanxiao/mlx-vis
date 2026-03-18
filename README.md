@@ -3,9 +3,9 @@
 [![arXiv](https://img.shields.io/badge/arXiv-2603.04035-b31b1b.svg)](https://arxiv.org/abs/2603.04035)
 [![PyPI](https://img.shields.io/pypi/v/mlx-vis.svg)](https://pypi.org/project/mlx-vis/)
 
-Pure MLX implementations of UMAP, t-SNE, PaCMAP, TriMap, DREAMS, CNE, and NNDescent for Apple Silicon. Metal GPU acceleration for both computation and video rendering. No scipy, no sklearn, no matplotlib.
+Pure MLX implementations of UMAP, t-SNE, PaCMAP, TriMap, DREAMS, CNE, MMAE, and NNDescent for Apple Silicon. Metal GPU acceleration for both computation and video rendering. No scipy, no sklearn, no matplotlib.
 
-Embed 70K points in **2-4 seconds**. Add GPU-rendered animation video in under **5 seconds** total. See [benchmark](#benchmark).
+Embed 70K points in **1-4 seconds**. Add GPU-rendered animation video in under **5 seconds** total. See [benchmark](#benchmark).
 
 Fashion-MNIST 70K on M3 Ultra:
 
@@ -14,6 +14,8 @@ Fashion-MNIST 70K on M3 Ultra:
 | ![UMAP](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/umap.png) | ![t-SNE](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/tsne.png) | ![PaCMAP](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/pacmap.png) |
 | **TriMap** | **DREAMS** | **CNE** |
 | ![TriMap](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/trimap.png) | ![DREAMS](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/dreams.png) | ![CNE](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/cne.png) |
+| **MMAE** | | |
+| ![MMAE](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/mmae.png) | | |
 
 Just for fun -- `morph_gpu` smoothly interpolates between all six methods:
 
@@ -39,7 +41,7 @@ Requires `mlx >= 0.20.0` and `numpy >= 1.24.0`.
 
 ```python
 import numpy as np
-from mlx_vis import UMAP, TSNE, PaCMAP, TriMap, DREAMS, CNE, NNDescent
+from mlx_vis import UMAP, TSNE, PaCMAP, TriMap, DREAMS, CNE, MMAE, NNDescent
 
 X = np.random.randn(10000, 128).astype(np.float32)
 
@@ -61,6 +63,9 @@ Y = DREAMS(n_components=2, lam=0.15).fit_transform(X)
 # CNE (contrastive neighbor embedding, unifies t-SNE and UMAP)
 Y = CNE(n_components=2, loss="infonce").fit_transform(X)
 
+# MMAE (manifold-matching autoencoder, preserves global metric structure)
+Y = MMAE(n_components=2, pca_dim=50).fit_transform(X)
+
 # NNDescent (approximate k-NN graph)
 indices, distances = NNDescent(k=15).build(X)
 
@@ -80,6 +85,7 @@ from mlx_vis.pacmap import PaCMAP
 from mlx_vis.trimap import TriMap
 from mlx_vis.dreams import DREAMS
 from mlx_vis.cne import CNE
+from mlx_vis.mmae import MMAE
 from mlx_vis.nndescent import NNDescent
 ```
 
@@ -144,12 +150,12 @@ https://github.com/user-attachments/assets/662597cb-b8d8-496f-9baa-ea3a19ae1bca
 
 Fashion-MNIST 70,000 x 784, M3 Ultra:
 
-| | UMAP | t-SNE | PaCMAP | TriMap | DREAMS | CNE |
-|---|---|---|---|---|---|---|
-| Iterations | 500 | 500 | 450 | 500 | 500 | 500 |
-| Embedding | 3.4s | 3.9s | 2.3s | 2.6s | 3.8s | 3.4s |
-| GPU render (800 frames) | 1.2s | 1.2s | 1.2s | 1.2s | 1.2s | 1.2s |
-| Total | 4.6s | 5.1s | 3.5s | 3.8s | 5.0s | 4.6s |
+| | UMAP | t-SNE | PaCMAP | TriMap | DREAMS | CNE | MMAE |
+|---|---|---|---|---|---|---|---|
+| Iterations | 500 | 500 | 450 | 500 | 500 | 500 | 39 epochs |
+| Embedding | 3.4s | 3.9s | 2.3s | 2.6s | 3.8s | 3.4s | 1.3s |
+| GPU render (800 frames) | 1.2s | 1.2s | 1.2s | 1.2s | 1.2s | 1.2s | - |
+| Total | 4.6s | 5.1s | 3.5s | 3.8s | 5.0s | 4.6s | 1.3s |
 
 ```python
 from mlx_vis import UMAP, animate_gpu
