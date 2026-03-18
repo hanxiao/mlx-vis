@@ -99,6 +99,7 @@ from mlx_vis.nndescent import NNDescent
 | TriMap | `TriMap(n_components, n_iters, ...)` | `fit_transform(X)` | `np.ndarray (n, d)` |
 | DREAMS | `DREAMS(n_components, lam, ...)` | `fit_transform(X)` | `np.ndarray (n, d)` |
 | CNE | `CNE(n_components, loss, n_negatives, ...)` | `fit_transform(X)` | `np.ndarray (n, d)` |
+| MMAE | `MMAE(n_components, pca_dim, lambda_mm, ...)` | `fit_transform(X)` | `np.ndarray (n, d)` |
 | NNDescent | `NNDescent(k, n_iters, ...)` | `build(X)` | `(indices, distances)` |
 
 ## Visualization
