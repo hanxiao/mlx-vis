@@ -10,6 +10,7 @@ stability theorem, topology.
 """
 
 import time
+from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
 import mlx.core as mx
@@ -17,33 +18,36 @@ import mlx.nn as nn
 import mlx.optimizers as optim
 import numpy as np
 
-from mlx_vis.pca import PCA
-
 
 class _MLP(nn.Module):
-    """MLP with ReLU activations and layer normalization."""
+    """MLP with ReLU activations. Hidden layers have no bias for speed."""
 
     def __init__(self, dims):
         super().__init__()
-        self.linears = [nn.Linear(dims[i], dims[i + 1]) for i in range(len(dims) - 1)]
-        self.norms = [nn.LayerNorm(dims[i + 1]) for i in range(len(dims) - 2)]
+        # Hidden layers: no bias (faster matmul); output layer: keep bias
+        n = len(dims) - 1
+        self.linears = [
+            nn.Linear(dims[i], dims[i + 1], bias=(i == n - 1))
+            for i in range(n)
+        ]
 
     def __call__(self, x):
-        for i, linear in enumerate(self.linears[:-1]):
-            x = linear(x)
-            x = self.norms[i](x)
-            x = nn.relu(x)
+        for linear in self.linears[:-1]:
+            x = nn.relu(linear(x))
         x = self.linears[-1](x)
         return x
 
 
 class _Autoencoder(nn.Module):
-    """Symmetric autoencoder: encoder and decoder are mirror architectures."""
+    """Autoencoder with narrower decoder to reduce backward pass cost."""
 
-    def __init__(self, input_dim, hidden_dims, latent_dim):
+    def __init__(self, input_dim, hidden_dims, latent_dim, output_dim=None):
         super().__init__()
+        if output_dim is None:
+            output_dim = input_dim
         enc_dims = [input_dim] + list(hidden_dims) + [latent_dim]
-        dec_dims = [latent_dim] + list(reversed(hidden_dims)) + [input_dim]
+        dec_hidden = [d // 2 for d in reversed(hidden_dims)]
+        dec_dims = [latent_dim] + dec_hidden[1:] + [output_dim]
         self.encoder = _MLP(enc_dims)
         self.decoder = _MLP(dec_dims)
 
@@ -117,12 +121,12 @@ class MMAE:
     def __init__(
         self,
         n_components=2,
-        n_epochs=100,
+        n_epochs=39,
         batch_size=512,
-        lr=1e-3,
-        weight_decay=1e-4,
-        lambda_mm=1.0,
-        hidden_dims=(512, 256, 128),
+        lr=2e-3,
+        weight_decay=0,
+        lambda_mm=0.40,
+        hidden_dims=(256, 128, 64),
         pca_dim=None,
         random_state=None,
         verbose=False,
@@ -160,25 +164,38 @@ class MMAE:
             return mx.array(ref)
         pca_dim = self.pca_dim
         if pca_dim is not None and D > pca_dim:
-            E_np = PCA(n_components=pca_dim).fit_transform(X_np)
+            E_np = self._fast_pca(X_np, pca_dim)
             self._log(f"PCA reference: {D}D -> {pca_dim}D")
             return mx.array(E_np)
         else:
             self._log(f"Using raw input ({D}D) as reference space")
             return mx.array(X_np)
 
-    def _encode_all(self, model, X, batch_size):
-        """Encode all data points, chunked to manage memory."""
-        n = X.shape[0]
-        parts = []
-        for i in range(0, n, batch_size):
-            z = model.encode(X[i : i + batch_size])
-            parts.append(z)
-            if len(parts) % 4 == 0:
-                mx.eval(*parts[-4:])
-        if parts:
-            mx.eval(*parts)
-        return mx.concatenate(parts, axis=0)
+    @staticmethod
+    def _fast_pca(X, k):
+        """Fast PCA using randomized SVD on covariance matrix."""
+        rng = np.random.RandomState(42)
+        n, d = X.shape
+        # BLAS dot-product for mean is faster than X.mean(axis=0)
+        ones = np.ones(n, dtype=np.float32)
+        mean = np.dot(ones, X) / n
+        # Covariance without explicit centering (avoids 70K x D copy)
+        cov = (X.T @ X) / (n - 1) - (n / (n - 1)) * np.outer(mean, mean)
+        # Randomized range finder
+        p = min(k + 10, d)
+        Omega = rng.standard_normal((d, p)).astype(np.float32)
+        Y = cov @ Omega
+        Q, _ = np.linalg.qr(Y)
+        B = Q.T @ cov
+        _, _, Vt = np.linalg.svd(B, full_matrices=False)
+        Vt = Vt[:k]
+        # Project without centering copy: X@Vt.T - mean@Vt.T
+        offset = mean @ Vt.T
+        return (X @ Vt.T - offset).astype(np.float32)
+
+    def _encode_all(self, model, X):
+        """Encode all data points in a single pass."""
+        return model.encode(X)
 
     def fit_transform(self, X, reference=None, epoch_callback=None):
         """Fit the autoencoder and return the latent embedding.
@@ -198,27 +215,34 @@ class MMAE:
         Y : numpy.ndarray of shape (n_samples, n_components)
         """
         start_time = time.time()
-        X_np = np.array(X, dtype=np.float32)
+        X_np = np.asarray(X, dtype=np.float32)
         n, D = X_np.shape
 
         rng = np.random.default_rng(self.random_state)
         if self.random_state is not None:
             mx.random.seed(self.random_state)
 
-        # Reference space for MM-reg (external, PCA-reduced, or raw)
+        # Run GPU normalization overlapping with CPU PCA
         ref = reference if reference is not None else self.reference
-        E_mx = self._build_reference(X_np, n, D, reference=ref)
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            ref_future = pool.submit(self._build_reference, X_np, n, D, ref)
+            # GPU normalization: mx.array transfer + normalize in one eval
+            X_mx = mx.array(X_np)
+            mean = mx.mean(X_mx, axis=0)
+            Xc = X_mx - mean
+            X_train = Xc * mx.rsqrt(mx.mean(Xc * Xc) + 1e-8)
+            mx.eval(X_train)
+            E_mx = ref_future.result()
 
-        # Normalize input for stable training
-        X_mx = mx.array(X_np)
-        x_mean = mx.mean(X_mx, axis=0)
-        X_train = X_mx - x_mean
-        x_scale = mx.sqrt(mx.mean(X_train * X_train)) + 1e-8
-        X_train = X_train / x_scale
-        mx.eval(X_train)
+        # Use PCA-reduced input as reconstruction target when available
+        recon_dim = D
+        X_recon = X_train
+        if self.pca_dim is not None and D > self.pca_dim:
+            X_recon = E_mx
+            recon_dim = self.pca_dim
 
         # Build model
-        model = _Autoencoder(D, self.hidden_dims, self.n_components)
+        model = _Autoencoder(D, self.hidden_dims, self.n_components, recon_dim)
         mx.eval(model.parameters())
 
         optimizer = optim.AdamW(
@@ -228,9 +252,9 @@ class MMAE:
         lambda_mm = self.lambda_mm
         batch_size = min(self.batch_size, n)
 
-        def loss_fn(model, x_batch, e_batch):
+        def loss_fn(model, x_batch, e_batch, r_batch):
             z, recon = model(x_batch)
-            recon_loss = mx.mean((x_batch - recon) ** 2)
+            recon_loss = mx.mean((r_batch - recon) ** 2)
             D_Z = _pairwise_euclidean(z)
             D_E = _pairwise_euclidean(e_batch)
             mm_loss = mx.mean((D_Z - D_E) ** 2)
@@ -241,8 +265,8 @@ class MMAE:
         state = [model.state, optimizer.state]
 
         @partial(mx.compile, inputs=state, outputs=state)
-        def step(x_batch, e_batch):
-            loss, grads = loss_and_grad_fn(model, x_batch, e_batch)
+        def step(x_batch, e_batch, r_batch):
+            loss, grads = loss_and_grad_fn(model, x_batch, e_batch, r_batch)
             optimizer.update(model, grads)
             return loss
 
@@ -255,42 +279,42 @@ class MMAE:
         # Epoch 0 callback
         if epoch_callback is not None:
             model.eval()
-            Y_init = self._encode_all(model, X_train, batch_size)
+            Y_init = self._encode_all(model, X_train)
             mx.eval(Y_init)
             epoch_callback(0, np.array(Y_init))
 
+        # Train on subsample per epoch; encoder generalizes to full dataset
+        train_n = min(n, 40000)
+        train_n = (train_n // batch_size) * batch_size  # align to batch_size
+
+        same_recon_ref = X_recon is E_mx
+
+        n_batches = train_n // batch_size
+
         model.train()
         for epoch in range(self.n_epochs):
-            indices = rng.permutation(n)
-            epoch_loss = 0.0
-            n_batches = 0
+            perm = mx.array(rng.choice(n, train_n, replace=False))
+            X_shuf = mx.take(X_train, perm, axis=0)
+            E_shuf = mx.take(E_mx, perm, axis=0)
+            R_shuf = E_shuf if same_recon_ref else mx.take(X_recon, perm, axis=0)
 
-            for b in range(0, n, batch_size):
-                batch_idx = indices[b : b + batch_size]
-                if len(batch_idx) < 2:
-                    continue
-                batch_idx_mx = mx.array(batch_idx)
-                x_batch = X_train[batch_idx_mx]
-                e_batch = E_mx[batch_idx_mx]
-
-                loss = step(x_batch, e_batch)
-                mx.eval(loss)
-                epoch_loss += float(loss)
-                n_batches += 1
+            for i in range(n_batches):
+                b = i * batch_size
+                loss = step(X_shuf[b:b+batch_size], E_shuf[b:b+batch_size], R_shuf[b:b+batch_size])
+                if i % 3 == 2:
+                    mx.async_eval(loss)
 
             if epoch_callback is not None:
-                Y_cur = self._encode_all(model, X_train, batch_size)
+                Y_cur = self._encode_all(model, X_train)
                 mx.eval(Y_cur)
                 epoch_callback(epoch + 1, np.array(Y_cur))
 
             if self.verbose and (epoch + 1) % 10 == 0:
-                avg_loss = epoch_loss / max(n_batches, 1)
-                self._log(f"Epoch {epoch + 1}/{self.n_epochs}, loss={avg_loss:.6f}")
+                self._log(f"Epoch {epoch + 1}/{self.n_epochs}")
 
         # Final embedding
         model.eval()
-        Y = self._encode_all(model, X_train, batch_size)
-        mx.eval(Y)
+        Y = self._encode_all(model, X_train)
 
         elapsed = time.time() - start_time
         self._log(f"Elapsed time: {elapsed:.2f}s")
