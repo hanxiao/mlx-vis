@@ -301,7 +301,7 @@ class MMAE:
             for i in range(n_batches):
                 b = i * batch_size
                 loss = step(X_shuf[b:b+batch_size], E_shuf[b:b+batch_size], R_shuf[b:b+batch_size])
-                if i % 3 == 2:
+                if i % 4 == 3:
                     mx.async_eval(loss)
 
             if epoch_callback is not None:
