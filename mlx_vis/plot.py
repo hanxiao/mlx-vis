@@ -490,3 +490,189 @@ def morph_gpu(Y_source, Y_target, labels=None, n_steps=300,
     proc.wait()
 
     return total_f
+
+
+def morph_all_effect(embeddings, labels=None, n_steps=200, fps=60,
+                     theme="dark", colors=None, point_size=1.5, alpha=1.0,
+                     hold=1.0, fade=0.5, decay=0.90, fade_decay=0.82,
+                     save="morph_all.mp4", width=1000, height=1000,
+                     bitrate=5000, order="similarity"):
+    """Morph carousel across multiple embeddings with comet trails and ease-in-out.
+
+    Cycles through all embeddings with smooth transitions, fading trails,
+    and cubic ease-in-out timing. All rendering runs on Metal GPU.
+
+    Parameters
+    ----------
+    embeddings : dict[str, array-like (n, 2)]
+        Named embeddings to morph between. All must share the same sample
+        ordering (embeddings[name][i] corresponds to the same input sample).
+    labels : array-like (n,), optional
+        Integer labels for coloring.
+    n_steps : int
+        Interpolation steps per transition (default 200).
+    fps : int
+        Frames per second (default 60).
+    hold : float
+        Seconds to hold each static endpoint (default 1.0).
+    fade : float
+        Seconds for trail fade-out at each endpoint (default 0.5).
+    decay : float
+        Trail decay factor per frame during morph (default 0.90).
+    fade_decay : float
+        Faster decay during fade-out phase (default 0.82).
+    save : str
+        Output video path.
+    order : str
+        "similarity" for greedy nearest-neighbor ordering (default),
+        or "given" to use dict insertion order.
+
+    Returns
+    -------
+    int : total frames rendered.
+    """
+    import subprocess
+    import mlx.core as mx
+
+    names = list(embeddings.keys())
+    n_methods = len(names)
+    if n_methods < 2:
+        raise ValueError("Need at least 2 embeddings")
+
+    # Procrustes-align all to first
+    raw = {n: np.asarray(embeddings[n], dtype=np.float64) for n in names}
+    n = len(raw[names[0]])
+
+    def _norm(Y):
+        Y = Y - Y.mean(0)
+        Y = Y / np.maximum(Y.std(0), 1e-8)
+        return Y
+
+    normed = {n: _norm(raw[n]) for n in names}
+    ref = normed[names[0]]
+    aligned = {names[0]: ref.astype(np.float32)}
+    for name in names[1:]:
+        M = ref.T @ normed[name]
+        U, _, Vt = np.linalg.svd(M)
+        d = np.linalg.det(U @ Vt)
+        R = U @ np.diag([1.0, d]) @ Vt
+        aligned[name] = (normed[name] @ R.T).astype(np.float32)
+
+    # Determine order
+    if order == "similarity" and n_methods > 2:
+        dist_matrix = np.zeros((n_methods, n_methods))
+        for i in range(n_methods):
+            for j in range(i + 1, n_methods):
+                mse = np.mean((aligned[names[i]] - aligned[names[j]]) ** 2)
+                dist_matrix[i, j] = dist_matrix[j, i] = mse
+        visited = [0]
+        remaining = set(range(1, n_methods))
+        while remaining:
+            last = visited[-1]
+            nearest = min(remaining, key=lambda x: dist_matrix[last, x])
+            visited.append(nearest)
+            remaining.remove(nearest)
+        ordered = [names[i] for i in visited]
+    else:
+        ordered = names
+
+    print(f"  order: {' -> '.join(ordered)}")
+
+    # Rendering setup
+    all_pts = np.concatenate(list(aligned.values()), axis=0)
+    xlim, ylim = _get_square_lims(all_pts)
+    xmin, xmax = float(xlim[0]), float(xlim[1])
+    ymin, ymax = float(ylim[0]), float(ylim[1])
+
+    c = _resolve_colors(labels, colors, n, theme)
+    c = np.array(c, dtype=np.float32)
+    c[:, 3] = alpha
+    colors_mx = mx.array(c)
+
+    bg_val = 0.0 if theme == "dark" else 1.0
+    bg_mx = mx.array([bg_val, bg_val, bg_val, 1.0], dtype=mx.float32)
+
+    from mlx_vis.render import _render_frame_mlx, _circle_template, _TEMPLATE_CACHE
+    point_radius = max(1.0, point_size)
+    rk = round(point_radius * 10)
+    if rk not in _TEMPLATE_CACHE:
+        _TEMPLATE_CACHE[rk] = _circle_template(point_radius)
+    offsets, weights = _TEMPLATE_CACHE[rk]
+
+    hold_f = int(hold * fps)
+    fade_f = int(fade * fps)
+    pairs = [(ordered[i], ordered[(i + 1) % len(ordered)]) for i in range(len(ordered))]
+    total_f = len(pairs) * (hold_f + n_steps + fade_f)
+
+    def _ease(t):
+        if t < 0.5:
+            return 4 * t * t * t
+        return 1 - (-2 * t + 2) ** 3 / 2
+
+    def _render(Y):
+        return _render_frame_mlx(Y, colors_mx, offsets, weights,
+                                 width, height, xmin, xmax, ymin, ymax, bg_mx)
+
+    # Encode
+    ffmpeg_cmd = [
+        "ffmpeg", "-y",
+        "-f", "rawvideo", "-pix_fmt", "rgba",
+        "-s", f"{width}x{height}", "-r", str(fps),
+        "-i", "pipe:",
+        "-c:v", "h264_videotoolbox",
+        "-b:v", f"{bitrate}k",
+        "-pix_fmt", "yuv420p",
+        save,
+    ]
+    proc = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE,
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    accum = mx.zeros((height, width, 4), dtype=mx.float32)
+    done = 0
+
+    for src_name, dst_name in pairs:
+        X0 = mx.array(aligned[src_name])
+        X1 = mx.array(aligned[dst_name])
+
+        # Hold
+        f = _render(X0)
+        mx.eval(f)
+        buf = np.array(f).tobytes()
+        accum = f.astype(mx.float32) / 255.0
+        for _ in range(hold_f):
+            proc.stdin.write(buf)
+        done += hold_f
+
+        # Morph with trails + ease-in-out
+        for step in range(n_steps):
+            t = _ease((step + 1) / n_steps)
+            Y = (1.0 - t) * X0 + t * X1
+            f = _render(Y)
+            f_float = f.astype(mx.float32) / 255.0
+            trail = accum * decay
+            accum = mx.maximum(trail, f_float)
+            out_frame = (mx.clip(accum, 0.0, 1.0) * 255).astype(mx.uint8)
+            mx.eval(out_frame)
+            proc.stdin.write(np.array(out_frame).tobytes())
+        done += n_steps
+
+        # Fade-out trails
+        endpoint = _render(X1)
+        endpoint_float = endpoint.astype(mx.float32) / 255.0
+        mx.eval(endpoint_float)
+        for _ in range(fade_f):
+            accum = accum * fade_decay
+            accum = mx.maximum(accum, endpoint_float)
+            out_frame = (mx.clip(accum, 0.0, 1.0) * 255).astype(mx.uint8)
+            mx.eval(out_frame)
+            proc.stdin.write(np.array(out_frame).tobytes())
+        done += fade_f
+
+        if done % 100 == 0 or done == total_f:
+            print(f"  {src_name} -> {dst_name} ({done}/{total_f})")
+
+    proc.stdin.close()
+    proc.wait()
+    print(f"  {done}/{total_f} frames, saved to {save}")
+
+    return total_f

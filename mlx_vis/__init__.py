@@ -11,7 +11,7 @@ from mlx_vis._cne.cne import CNE
 from mlx_vis._mmae.mmae import MMAE
 from mlx_vis._nndescent.nndescent import NNDescent
 
-from mlx_vis.plot import scatter, scatter_gpu, animate, animate_gpu, morph_gpu
+from mlx_vis.plot import scatter, scatter_gpu, animate, animate_gpu, morph_gpu, morph_all_effect
 
 __all__ = ["UMAP", "TSNE", "PaCMAP", "LocalMAP", "TriMap", "DREAMS", "CNE", "MMAE", "NNDescent",
-           "scatter", "scatter_gpu", "animate", "animate_gpu", "morph_gpu"]
+           "scatter", "scatter_gpu", "animate", "animate_gpu", "morph_gpu", "morph_all_effect"]
