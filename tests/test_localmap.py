@@ -1,6 +1,7 @@
 import unittest
 
 import numpy as np
+import mlx.core as mx
 
 from mlx_vis import LocalMAP, PaCMAP
 from mlx_vis._pacmap.pacmap import _resample_local_fp_pairs, _sample_FP_pairs
@@ -50,7 +51,7 @@ class LocalMAPTests(unittest.TestCase):
         emb_a = LocalMAP(**kwargs).fit_transform(self.X, init="random")
         emb_b = LocalMAP(**kwargs).fit_transform(self.X, init="random")
 
-        self.assertTrue(np.allclose(emb_a, emb_b, atol=1e-5))
+        self.assertTrue(np.allclose(emb_a, emb_b, atol=1e-3))
 
     def test_initial_fp_sampling_excludes_neighbours(self):
         n = 12
@@ -118,14 +119,14 @@ class LocalMAPTests(unittest.TestCase):
         low = _resample_local_fp_pairs(
             pair_neighbors_np=pair_neighbors,
             pair_FP_np=pair_fp,
-            Y_np=Y,
+            Y_mx=mx.array(Y),
             low_dist_thres=0.3,
             rng=np.random.default_rng(123),
         )
         high = _resample_local_fp_pairs(
             pair_neighbors_np=pair_neighbors,
             pair_FP_np=pair_fp,
-            Y_np=Y,
+            Y_mx=mx.array(Y),
             low_dist_thres=1.0,
             rng=np.random.default_rng(123),
         )

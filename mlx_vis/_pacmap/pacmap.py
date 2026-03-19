@@ -177,65 +177,53 @@ def _sample_FP_pairs(n, pair_neighbors_np, n_neighbors, n_FP, rng):
     return pair_FP
 
 
-def _resample_local_fp_pairs(pair_neighbors_np, pair_FP_np, Y_np, low_dist_thres, rng):
-    """Resample further pairs using the current embedding locality."""
+def _resample_local_fp_pairs(pair_neighbors_np, pair_FP_np, Y_mx, low_dist_thres, rng):
+    """Resample further pairs using embedding locality (pure MLX GPU)."""
     if pair_FP_np.size == 0 or low_dist_thres <= 0:
         return pair_FP_np
 
-    n = Y_np.shape[0]
+    n = Y_mx.shape[0]
     n_FP = pair_FP_np.shape[0] // n
+    threshold_sq = float(low_dist_thres) ** 2
+    # Oversample to ensure enough valid candidates after filtering
+    sample_size = max(n_FP * 8, 64)
+
+    # Random candidates on GPU
+    candidates = mx.random.randint(0, n, shape=(n, sample_size))  # (n, S)
+
+    # Mask: not self
+    src_ids = mx.arange(n).reshape(n, 1)  # (n, 1)
+    mask = candidates != src_ids
+
+    # Mask: not neighbors
     n_neighbors = pair_neighbors_np.shape[0] // n if pair_neighbors_np.size else 0
-    neighbour_rows = pair_neighbors_np[:, 1].reshape(n, n_neighbors) if n_neighbors else None
+    if n_neighbors > 0:
+        nb_cols = mx.array(pair_neighbors_np[:, 1].reshape(n, n_neighbors))  # (n, K)
+        for k in range(n_neighbors):
+            mask = mask & (candidates != nb_cols[:, k:k + 1])
+
+    # Mask: within distance threshold
+    diff = Y_mx[candidates] - Y_mx[src_ids]         # (n, S, dim)
+    dist_sq = mx.sum(diff * diff, axis=2)            # (n, S)
+    mask = mask & (dist_sq <= threshold_sq)
+
+    # Sort valid candidates first per row using a large-value trick:
+    # invalid candidates get sort key = sample_size, valid ones get their column index
+    col_idx = mx.broadcast_to(mx.arange(sample_size).reshape(1, sample_size), (n, sample_size))
+    sort_key = mx.where(mask, col_idx, mx.array(sample_size))
+    order = mx.argsort(sort_key, axis=1)  # valid first per row
+
+    # Gather sorted candidates, take first n_FP per row
+    sorted_cands = mx.take_along_axis(candidates, order, axis=1)[:, :n_FP]  # (n, n_FP)
+    sorted_valid = mx.take_along_axis(mask, order, axis=1)[:, :n_FP]        # (n, n_FP)
+
+    # Fall back to existing FP pairs where we didn't find enough valid candidates
+    existing_dst = mx.array(pair_FP_np[:, 1].reshape(n, n_FP))
+    result_dst = mx.where(sorted_valid, sorted_cands, existing_dst)
+    mx.eval(result_dst)
 
     updated = pair_FP_np.copy()
-    threshold_sq = float(low_dist_thres) ** 2
-    sample_factor = max(8, 2 * n_FP)
-    max_rounds = 12
-
-    for i in range(n):
-        row_start = i * n_FP
-        row_end = row_start + n_FP
-        chosen = []
-        chosen_set = set()
-
-        reject = {i}
-        if neighbour_rows is not None:
-            reject.update(int(x) for x in neighbour_rows[i])
-        reject_values = np.fromiter(reject, dtype=np.int32)
-
-        rounds = 0
-        while len(chosen) < n_FP and rounds < max_rounds:
-            remaining = n_FP - len(chosen)
-            batch_size = max(sample_factor, remaining * sample_factor)
-            candidates = rng.integers(0, n, size=batch_size, dtype=np.int32)
-            if reject_values.size:
-                candidates = candidates[~np.isin(candidates, reject_values, assume_unique=False)]
-            if candidates.size == 0:
-                rounds += 1
-                continue
-
-            diff = Y_np[candidates] - Y_np[i]
-            dist_sq = np.sum(diff * diff, axis=1)
-            candidates = candidates[dist_sq <= threshold_sq]
-            if candidates.size == 0:
-                rounds += 1
-                continue
-
-            for candidate in candidates.tolist():
-                if candidate in chosen_set:
-                    continue
-                chosen.append(candidate)
-                chosen_set.add(candidate)
-                if len(chosen) == n_FP:
-                    break
-
-            rounds += 1
-
-        if chosen:
-            updated[row_start:row_start + len(chosen), 1] = np.asarray(chosen, dtype=np.int32)
-            if len(chosen) < n_FP:
-                updated[row_start + len(chosen):row_end, 1] = pair_FP_np[row_start + len(chosen):row_end, 1]
-
+    updated[:, 1] = np.array(result_dst).ravel()
     return updated
 
 
@@ -508,6 +496,8 @@ class PaCMAP:
         if n <= 0:
             raise ValueError("The sample size must be larger than 0")
         rng = np.random.default_rng(self.random_state)
+        if self.random_state is not None:
+            mx.random.seed(self.random_state)
         localmap = low_dist_thres is not None
 
         # Preprocess
@@ -649,7 +639,7 @@ class PaCMAP:
 
             if localmap and itr > phase1 + phase2 and itr % 10 == 0 and pair_FP.size:
                 mx.eval(Y, m, v)
-                pair_FP = _resample_local_fp_pairs(pair_neighbors, pair_FP, np.array(Y), low_dist_thres, rng)
+                pair_FP = _resample_local_fp_pairs(pair_neighbors, pair_FP, Y, low_dist_thres, rng)
                 src_fp, dst_fp = _pair_indices(pair_FP)
                 mx.eval(src_fp, dst_fp)
 

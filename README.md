@@ -14,8 +14,8 @@ Fashion-MNIST 70K on M3 Ultra:
 | ![UMAP](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/umap.png) | ![t-SNE](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/tsne.png) | ![PaCMAP](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/pacmap.png) |
 | **TriMap** | **DREAMS** | **CNE** |
 | ![TriMap](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/trimap.png) | ![DREAMS](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/dreams.png) | ![CNE](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/cne.png) |
-| **MMAE** | | |
-| ![MMAE](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/mmae.png) | | |
+| **MMAE** | **LocalMAP** | |
+| ![MMAE](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/mmae.png) | ![LocalMAP](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/localmap.png) | |
 
 Just for fun -- `morph_gpu` smoothly interpolates between the included methods:
 
