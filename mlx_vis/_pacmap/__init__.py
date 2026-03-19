@@ -1,3 +1,3 @@
-from .pacmap import PaCMAP
+from .pacmap import LocalMAP, PaCMAP
 
-__all__ = ["PaCMAP"]
+__all__ = ["PaCMAP", "LocalMAP"]

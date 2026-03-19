@@ -1,5 +1,5 @@
-"""PaCMAP wrapper - re-exports from submodule."""
+"""PaCMAP wrappers - re-exports from submodule."""
 
-from mlx_vis._pacmap.pacmap import PaCMAP
+from mlx_vis._pacmap.pacmap import LocalMAP, PaCMAP
 
-__all__ = ["PaCMAP"]
+__all__ = ["PaCMAP", "LocalMAP"]
