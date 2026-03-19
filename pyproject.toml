@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mlx-vis"
-version = "0.5.0"
-description = "Pure MLX implementations of UMAP, t-SNE, PaCMAP, TriMap, DREAMS, CNE, MMAE, and NNDescent for Apple Silicon. Metal GPU acceleration for both computation and video rendering. No scipy, no sklearn, no matplotlib."
+version = "0.6.0"
+description = "Pure MLX implementations of UMAP, t-SNE, PaCMAP, LocalMAP, TriMap, DREAMS, CNE, MMAE, and NNDescent for Apple Silicon. Metal GPU acceleration for both computation and video rendering. No scipy, no sklearn, no matplotlib."
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"
