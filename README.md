@@ -17,9 +17,9 @@ Fashion-MNIST 70K on M3 Ultra:
 | [**MMAE**](https://arxiv.org/abs/2603.16568) | [**LocalMAP**](https://arxiv.org/abs/2412.15426) | |
 | ![MMAE](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/mmae.png) | ![LocalMAP](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/localmap.png) | |
 
-Just for fun -- `morph_gpu` smoothly interpolates between the included methods:
+Just for fun -- `morph_all_effect` smoothly morphs between all methods with comet trails and ease-in-out timing:
 
-https://github.com/user-attachments/assets/b11418e0-51f6-4a73-8150-8a40097662cc
+https://github.com/user-attachments/assets/2d5d785b-77f3-4738-bb5a-3b06f840fb0e
 
 ## Install
 
