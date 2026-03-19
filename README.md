@@ -9,12 +9,12 @@ Embed 70K points in **1-4 seconds**. Add GPU-rendered animation video in under *
 
 Fashion-MNIST 70K on M3 Ultra:
 
-| UMAP | t-SNE | PaCMAP |
+| [UMAP](https://arxiv.org/abs/1802.03426) | [t-SNE](https://www.jmlr.org/papers/v9/vandermaaten08a.html) | [PaCMAP](https://arxiv.org/abs/2012.04456) |
 |:---:|:---:|:---:|
 | ![UMAP](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/umap.png) | ![t-SNE](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/tsne.png) | ![PaCMAP](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/pacmap.png) |
-| **TriMap** | **DREAMS** | **CNE** |
+| [**TriMap**](https://arxiv.org/abs/1910.00204) | [**DREAMS**](https://arxiv.org/abs/2508.13747) | [**CNE**](https://arxiv.org/abs/2206.01816) |
 | ![TriMap](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/trimap.png) | ![DREAMS](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/dreams.png) | ![CNE](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/cne.png) |
-| **MMAE** | **LocalMAP** | |
+| [**MMAE**](https://arxiv.org/abs/2603.16568) | [**LocalMAP**](https://arxiv.org/abs/2412.15426) | |
 | ![MMAE](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/mmae.png) | ![LocalMAP](https://raw.githubusercontent.com/hanxiao/mlx-vis/main/assets/localmap.png) | |
 
 Just for fun -- `morph_gpu` smoothly interpolates between the included methods:
