@@ -152,14 +152,18 @@ https://github.com/user-attachments/assets/0461359c-7e35-4458-9f06-8db8711f8ade
 
 https://github.com/user-attachments/assets/662597cb-b8d8-496f-9baa-ea3a19ae1bca
 
+**LocalMAP:**
+
+https://github.com/user-attachments/assets/cc9d717c-f863-421c-9cfe-150ebc5c93cd
+
 ### Benchmark
 
 Fashion-MNIST 70,000 x 784, M3 Ultra:
 
-| | UMAP | t-SNE | PaCMAP | TriMap | DREAMS | CNE | MMAE |
-|---|---|---|---|---|---|---|---|
-| Iterations | 500 | 500 | 450 | 500 | 500 | 500 | 39 epochs |
-| Embedding | 3.4s | 3.9s | 2.3s | 2.6s | 3.8s | 3.4s | 1.3s |
+| | UMAP | t-SNE | PaCMAP | LocalMAP | TriMap | DREAMS | CNE | MMAE |
+|---|---|---|---|---|---|---|---|---|
+| Iterations | 500 | 500 | 450 | 450 | 500 | 500 | 500 | 39 epochs |
+| Embedding | 3.4s | 3.9s | 2.3s | 4.2s | 2.6s | 3.8s | 3.4s | 1.3s |
 | GPU render (800 frames) | 1.2s | 1.2s | 1.2s | 1.2s | 1.2s | 1.2s | - |
 | Total | 4.6s | 5.1s | 3.5s | 3.8s | 5.0s | 4.6s | 1.3s |
 
