@@ -239,7 +239,8 @@ def animate(snapshots, labels=None, timestamps=None, method_name="",
 def animate_gpu(snapshots, labels=None, timestamps=None, method_name="",
                 dataset_name="", fps=120, theme="dark", colors=None,
                 point_size=2, alpha=1.0, init_hold=0.5, end_hold=2.0,
-                save="animation.mp4", width=1000, height=1000, bitrate=8000):
+                save="animation.mp4", width=1000, height=1000, bitrate=8000,
+                blend="screen"):
     """GPU-accelerated animation using MLX Metal + ffmpeg pipe.
 
     Renders on Metal GPU without matplotlib.
@@ -286,7 +287,8 @@ def animate_gpu(snapshots, labels=None, timestamps=None, method_name="",
     def _render(idx):
         Y_mx = mx.array(snapshots_np[idx])
         return _render_frame_mlx(Y_mx, colors_mx, offsets, weights,
-                                 width, height, xmin, xmax, ymin, ymax, bg_mx)
+                                 width, height, xmin, xmax, ymin, ymax, bg_mx,
+                                 blend=blend)
 
     ffmpeg_cmd = [
         "ffmpeg", "-y",
