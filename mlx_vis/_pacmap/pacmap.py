@@ -373,6 +373,10 @@ class PaCMAP:
     random_state : int or None, default=None
     verbose : bool, default=False
     apply_pca : bool, default=True
+    normalize : str or bool, default=False
+        Input normalization before PCA/embedding.
+        False/None = no normalization, True/"standard" = z-score per feature,
+        "minmax" = min-max scaling to [0,1] per feature.
     """
 
     def __init__(
@@ -387,6 +391,7 @@ class PaCMAP:
         verbose=False,
         apply_pca=True,
         knn_method: str = "auto",
+        normalize: str | bool = False,
     ):
         self.n_components = n_components
         self.n_neighbors = n_neighbors
@@ -401,6 +406,7 @@ class PaCMAP:
         self.verbose = verbose
         self.apply_pca = apply_pca
         self.knn_method = knn_method
+        self.normalize = normalize
         self.embedding_ = None
 
     def _log(self, msg):
@@ -492,6 +498,10 @@ class PaCMAP:
         """Shared implementation for PaCMAP and LocalMAP."""
         start_time = time.time()
         X_np = np.array(X, dtype=np.float32)
+
+        from mlx_vis._normalize import normalize_input
+        X_np = normalize_input(X_np, self.normalize)
+
         n, _ = X_np.shape
         if n <= 0:
             raise ValueError("The sample size must be larger than 0")
@@ -689,6 +699,7 @@ class LocalMAP(PaCMAP):
         apply_pca=True,
         knn_method: str = "auto",
         low_dist_thres=10.0,
+        normalize: str | bool = False,
     ):
         super().__init__(
             n_components=n_components,
@@ -701,6 +712,7 @@ class LocalMAP(PaCMAP):
             verbose=verbose,
             apply_pca=apply_pca,
             knn_method=knn_method,
+            normalize=normalize,
         )
         self.low_dist_thres = float(low_dist_thres)
 

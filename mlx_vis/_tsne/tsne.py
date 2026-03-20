@@ -83,6 +83,9 @@ class TSNE:
         random_state: Random seed.
         verbose: Print every N iters (0 = silent).
         pca_dim: PCA preprocessing dim (default 50). None to skip.
+        normalize: Input normalization before PCA/embedding (default False).
+            False/None = no normalization, True/"standard" = z-score per feature,
+            "minmax" = min-max scaling to [0,1] per feature.
     """
 
     def __init__(
@@ -97,6 +100,7 @@ class TSNE:
         verbose: int = 0,
         pca_dim: int | None = 50,
         knn_method: str = "auto",
+        normalize: str | bool = False,
     ):
         self.n_components = n_components
         self.perplexity = perplexity
@@ -108,12 +112,17 @@ class TSNE:
         self.verbose = verbose
         self.pca_dim = pca_dim
         self.knn_method = knn_method
+        self.normalize = normalize
         self.embedding_ = None
 
     def fit_transform(self, X, epoch_callback=None) -> np.ndarray:
         if isinstance(X, mx.array):
             X = np.array(X)
         X = np.asarray(X, dtype=np.float32)
+
+        from mlx_vis._normalize import normalize_input
+        X = normalize_input(X, self.normalize)
+
         n, dim = X.shape
 
         # PCA preprocessing

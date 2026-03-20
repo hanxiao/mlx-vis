@@ -40,6 +40,10 @@ class CNE:
         Random seed for reproducibility.
     verbose : bool
         Print progress information.
+    normalize : str or bool
+        Input normalization before PCA/embedding (default False).
+        False/None = no normalization, True/"standard" = z-score per feature,
+        "minmax" = min-max scaling to [0,1] per feature.
     """
 
     def __init__(
@@ -55,6 +59,7 @@ class CNE:
         random_state=None,
         verbose=False,
         knn_method: str = "auto",
+        normalize: str | bool = False,
     ):
         if loss not in ("infonce", "nce", "neg"):
             raise ValueError(f"Unknown loss: {loss!r}. Use 'infonce', 'nce', or 'neg'.")
@@ -69,6 +74,7 @@ class CNE:
         self.random_state = random_state
         self.verbose = verbose
         self.knn_method = knn_method
+        self.normalize = normalize
         self.embedding_ = None
 
     def fit_transform(self, X, epoch_callback=None):
@@ -86,6 +92,10 @@ class CNE:
         if isinstance(X, mx.array):
             X = np.array(X)
         X = np.asarray(X, dtype=np.float32)
+
+        from mlx_vis._normalize import normalize_input
+        X = normalize_input(X, self.normalize)
+
         n, dim = X.shape
 
         if self.verbose:

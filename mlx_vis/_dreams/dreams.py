@@ -30,6 +30,9 @@ class DREAMS:
             Separate from the 2D PCA reference embedding.
         random_state: Random seed.
         verbose: Print every N iters (0 = silent).
+        normalize: Input normalization before PCA/embedding (default False).
+            False/None = no normalization, True/"standard" = z-score per feature,
+            "minmax" = min-max scaling to [0,1] per feature.
     """
 
     def __init__(
@@ -45,6 +48,7 @@ class DREAMS:
         random_state: int | None = None,
         verbose: int = 0,
         knn_method: str = "auto",
+        normalize: str | bool = False,
     ):
         self.n_components = n_components
         self.perplexity = perplexity
@@ -57,12 +61,17 @@ class DREAMS:
         self.random_state = random_state
         self.verbose = verbose
         self.knn_method = knn_method
+        self.normalize = normalize
         self.embedding_ = None
 
     def fit_transform(self, X, epoch_callback=None) -> np.ndarray:
         if isinstance(X, mx.array):
             X = np.array(X)
         X = np.asarray(X, dtype=np.float32)
+
+        from mlx_vis._normalize import normalize_input
+        X = normalize_input(X, self.normalize)
+
         n, dim = X.shape
 
         # PCA preprocessing (high-dim to pca_dim)

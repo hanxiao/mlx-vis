@@ -116,6 +116,10 @@ class MMAE:
         Print progress during training.
     knn_method : str, default="auto"
         Unused - kept for API compatibility with other algorithms.
+    normalize : str or bool, default=False
+        Input normalization before PCA/embedding.
+        False/None = no normalization, True/"standard" = z-score per feature,
+        "minmax" = min-max scaling to [0,1] per feature.
     """
 
     def __init__(
@@ -132,6 +136,7 @@ class MMAE:
         verbose=False,
         reference=None,
         knn_method="auto",
+        normalize: str | bool = False,
     ):
         self.n_components = n_components
         self.n_epochs = n_epochs
@@ -145,6 +150,7 @@ class MMAE:
         self.verbose = verbose
         self.reference = reference
         self.knn_method = knn_method
+        self.normalize = normalize
         self.embedding_ = None
 
     def _log(self, msg):
@@ -216,6 +222,10 @@ class MMAE:
         """
         start_time = time.time()
         X_np = np.asarray(X, dtype=np.float32)
+
+        from mlx_vis._normalize import normalize_input
+        X_np = normalize_input(X_np, self.normalize)
+
         n, D = X_np.shape
 
         rng = np.random.default_rng(self.random_state)

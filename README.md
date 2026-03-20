@@ -5,7 +5,7 @@
 
 Pure MLX implementations of UMAP, t-SNE, PaCMAP, LocalMAP, TriMap, DREAMS, CNE, MMAE, and NNDescent for Apple Silicon. Metal GPU acceleration for both computation and video rendering. No scipy, no sklearn, no matplotlib.
 
-Embed 70K points in **1-4 seconds**. Add GPU-rendered animation video in under **5 seconds** total. See [benchmark](#benchmark).
+Embed 70K points in **2-5 seconds** with under **3.2 GB** GPU memory. Add GPU-rendered animation video in under **6 seconds** total. See [benchmark](#benchmark).
 
 Fashion-MNIST 70K on M3 Ultra:
 
@@ -162,10 +162,11 @@ Fashion-MNIST 70,000 x 784, M3 Ultra:
 
 | | UMAP | t-SNE | PaCMAP | LocalMAP | TriMap | DREAMS | CNE | MMAE |
 |---|---|---|---|---|---|---|---|---|
-| Iterations | 500 | 500 | 450 | 450 | 500 | 500 | 500 | 39 epochs |
-| Embedding | 3.4s | 3.9s | 2.3s | 4.2s | 2.6s | 3.8s | 3.4s | 1.3s |
-| GPU render (800 frames) | 1.2s | 1.2s | 1.2s | 1.2s | 1.2s | 1.2s | - |
-| Total | 4.6s | 5.1s | 3.5s | 3.8s | 5.0s | 4.6s | 1.3s |
+| Iterations | 500 | 500 | 500 | 500 | 500 | 500 | 500 | 500 |
+| Embedding | 2.5s | 4.7s | 3.8s | 4.0s | 2.0s | 4.7s | 3.0s | 18.8s |
+| Peak GPU Mem | 2.5 GB | 3.2 GB | 3.0 GB | 3.0 GB | 2.6 GB | 3.2 GB | 2.3 GB | 1.7 GB |
+| GPU render (800 frames) | 1.4s | 1.4s | 1.4s | 1.4s | 1.4s | 1.4s | 1.4s | - |
+| Total | 3.9s | 6.1s | 5.2s | 5.4s | 3.4s | 6.1s | 4.4s | 18.8s |
 
 ```python
 from mlx_vis import UMAP, animate_gpu

@@ -38,6 +38,9 @@ class UMAP:
         pca_dim: PCA preprocessing dimension (default None = no PCA).
             Set to e.g. 100 to reduce high-dimensional inputs before KNN.
             Reduces curse of dimensionality and speeds up distance computation.
+        normalize: Input normalization before PCA/embedding (default False).
+            False/None = no normalization, True/"standard" = z-score per feature,
+            "minmax" = min-max scaling to [0,1] per feature.
     """
 
     def __init__(
@@ -53,6 +56,7 @@ class UMAP:
         verbose: bool = False,
         pca_dim: int | None = None,
         knn_method: str = "auto",
+        normalize: str | bool = False,
     ):
         self.n_components = n_components
         self.n_neighbors = n_neighbors
@@ -65,6 +69,7 @@ class UMAP:
         self.verbose = verbose
         self.pca_dim = pca_dim
         self.knn_method = knn_method
+        self.normalize = normalize
         self.embedding_ = None
 
     def fit_transform(self, X, epoch_callback=None) -> np.ndarray:
@@ -77,6 +82,10 @@ class UMAP:
         if isinstance(X, mx.array):
             X = np.array(X)
         X = np.asarray(X, dtype=np.float32)
+
+        from mlx_vis._normalize import normalize_input
+        X = normalize_input(X, self.normalize)
+
         n, dim = X.shape
 
         # Optional PCA preprocessing for high-dimensional data
